@@ -3,6 +3,38 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Resolve-HostKeyAlias {
+    param(
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$Value,
+        [Parameter(Mandatory)][bool]$Specified
+    )
+
+    if (-not $Specified) {
+        return ''
+    }
+    # Deliberately narrow ASCII token contract; no trim/case folding or config parsing.
+    # Absolute anchors reject trailing LF as well as option/argument delimiters.
+    if ($Value -cnotmatch '\A[A-Za-z0-9][A-Za-z0-9._-]{0,252}\z') {
+        throw 'SSH_HOST_KEY_ALIAS_INVALID'
+    }
+    return $Value
+}
+
+function Assert-ActionDisplayText {
+    param(
+        [AllowNull()][AllowEmptyString()][string]$Value,
+        [int]$MaxLength,
+        [string]$FailureCode,
+        [switch]$AllowEmpty
+    )
+    $text = if ($null -eq $Value) { '' } else { $Value }
+    if (($text.Length -eq 0 -and -not $AllowEmpty) -or
+        ($text.Length -gt 0 -and [string]::IsNullOrWhiteSpace($text)) -or
+        $text.Length -gt $MaxLength -or $text.IndexOfAny([char[]]@(0, 10, 13)) -ge 0) {
+        throw $FailureCode
+    }
+}
+
 function Assert-ActionInput {
     param(
         [Parameter(Mandatory)][string]$AuthorizationId,
@@ -102,9 +134,19 @@ function Get-ActionRecord {
         [Parameter(Mandatory)][string]$KnownHostsFile,
         [Parameter()][AllowEmptyString()][string]$IdentityFile,
         [Parameter(Mandatory)][int]$TimeoutSeconds,
-        [Parameter(Mandatory)][int]$MaxOutputBytes
+        [Parameter(Mandatory)][int]$MaxOutputBytes,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$HostKeyAlias,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$ActionTitle,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$ActionDescription
     )
 
+    $normalizedAlias = Resolve-HostKeyAlias -Value $HostKeyAlias -Specified $PSBoundParameters.ContainsKey('HostKeyAlias')
+    if ($PSBoundParameters.ContainsKey('ActionTitle')) {
+        Assert-ActionDisplayText -Value $ActionTitle -MaxLength 128 -FailureCode 'ACTION_TITLE_INVALID'
+    }
+    if ($PSBoundParameters.ContainsKey('ActionDescription')) {
+        Assert-ActionDisplayText -Value $ActionDescription -MaxLength 512 -FailureCode 'ACTION_DESCRIPTION_INVALID' -AllowEmpty
+    }
     Assert-ActionInput `
         -AuthorizationId $AuthorizationId `
         -HostName $HostName `
@@ -117,7 +159,7 @@ function Get-ActionRecord {
     $sshPath = 'C:\Windows\System32\OpenSSH\ssh.exe'
     $remoteHelperPath = Get-PortableHelperPath
     $identityMetadata = Get-FileMetadataIdentity -LiteralPath $IdentityFile
-    [ordered]@{
+    $record = [ordered]@{
         schema_version       = 1
         authorization_id     = $AuthorizationId
         host_name            = $HostName
@@ -137,6 +179,13 @@ function Get-ActionRecord {
         ssh_sha256           = Get-FileSha256Text -LiteralPath $sshPath
         remote_helper_sha256 = Get-FileSha256Text -LiteralPath $remoteHelperPath
     }
+    # Omission preserves the legacy schema, serialization and digest exactly.
+    if ($normalizedAlias) {
+        $record['host_key_alias'] = $normalizedAlias
+    }
+    if ($PSBoundParameters.ContainsKey('ActionTitle')) { $record['action_title'] = $ActionTitle }
+    if ($PSBoundParameters.ContainsKey('ActionDescription')) { $record['action_description'] = $ActionDescription }
+    return $record
 }
 
 function Get-RecordDigest {
@@ -182,9 +231,19 @@ function New-SolisSudoActionDigest {
         [Parameter(Mandatory)][string]$KnownHostsFile,
         [Parameter()][AllowEmptyString()][string]$IdentityFile = '',
         [Parameter()][ValidateRange(1, 3600)][int]$TimeoutSeconds = 120,
-        [Parameter()][ValidateRange(1, 16777216)][int]$MaxOutputBytes = 1048576
+        [Parameter()][ValidateRange(1, 16777216)][int]$MaxOutputBytes = 1048576,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$HostKeyAlias,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$ActionTitle,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$ActionDescription
     )
 
+    $aliasParameters = @{}
+    if ($PSBoundParameters.ContainsKey('HostKeyAlias')) {
+        $aliasParameters.HostKeyAlias = $HostKeyAlias
+    }
+    foreach ($name in @('ActionTitle', 'ActionDescription')) {
+        if ($PSBoundParameters.ContainsKey($name)) { $aliasParameters[$name] = $PSBoundParameters[$name] }
+    }
     $record = Get-ActionRecord `
         -AuthorizationId $AuthorizationId `
         -HostName $HostName `
@@ -195,7 +254,7 @@ function New-SolisSudoActionDigest {
         -KnownHostsFile $KnownHostsFile `
         -IdentityFile $IdentityFile `
         -TimeoutSeconds $TimeoutSeconds `
-        -MaxOutputBytes $MaxOutputBytes
+        -MaxOutputBytes $MaxOutputBytes @aliasParameters
     Get-RecordDigest -Record $record
 }
 
@@ -244,6 +303,7 @@ function Resolve-SecureInputPair {
     param(
         [Parameter(Mandatory, ParameterSetName = 'Pair')][Security.SecureString]$First,
         [Parameter(Mandatory, ParameterSetName = 'Pair')][Security.SecureString]$Second,
+        [Parameter(ParameterSetName = 'Pair')][switch]$ValidateOnly,
         [Parameter(Mandatory, ParameterSetName = 'Cancelled')][switch]$Cancelled
     )
 
@@ -276,6 +336,9 @@ function Resolve-SecureInputPair {
             return [pscustomobject]@{ Status = 'MISMATCH'; Secret = $null }
         }
 
+        if ($ValidateOnly) {
+            return [pscustomobject]@{ Status = 'SUCCESS'; Secret = $null }
+        }
         $copy = $First.Copy()
         $copy.MakeReadOnly()
         return [pscustomobject]@{ Status = 'SUCCESS'; Secret = $copy }
@@ -292,18 +355,24 @@ function Resolve-SecureInputPair {
     }
 }
 
-function Show-MaskedCredentialDialog {
+function New-MaskedCredentialDialog {
     param(
         [Parameter(Mandatory)][string]$AuthorizationId,
         [Parameter(Mandatory)][string]$ActionDigest,
         [Parameter(Mandatory)][string]$Destination,
-        [Parameter(Mandatory)][string]$CommandSummary
+        [Parameter(Mandatory)][string]$CommandSummary,
+        [Parameter()][AllowEmptyString()][string]$HostKeyAlias = '',
+        [Parameter()][AllowEmptyString()][string]$ActionTitle = '仅为下列已授权动作输入本次 sudo 密码',
+        [Parameter()][AllowEmptyString()][string]$ActionDescription = ''
     )
 
+    Assert-ActionDisplayText -Value $ActionTitle -MaxLength 128 -FailureCode 'ACTION_TITLE_INVALID'
+    Assert-ActionDisplayText -Value $ActionDescription -MaxLength 512 -FailureCode 'ACTION_DESCRIPTION_INVALID' -AllowEmpty
     $window = [Windows.Window]::new()
     $window.Title = 'Solis 一次性 sudo 授权输入'
     $window.Width = 680
-    $window.SizeToContent = [Windows.SizeToContent]::Height
+    $window.Height = 600
+    $window.SizeToContent = [Windows.SizeToContent]::Manual
     $window.ResizeMode = [Windows.ResizeMode]::NoResize
     $window.WindowStartupLocation = [Windows.WindowStartupLocation]::CenterScreen
     $window.Topmost = $true
@@ -313,17 +382,43 @@ function Show-MaskedCredentialDialog {
     $panel.Margin = [Windows.Thickness]::new(24)
 
     $heading = [Windows.Controls.TextBlock]::new()
-    $heading.Text = '仅为下列已授权动作输入本次 sudo 密码'
+    $heading.Text = $ActionTitle
+    $heading.TextWrapping = [Windows.TextWrapping]::Wrap
     $heading.FontSize = 18
     $heading.FontWeight = [Windows.FontWeights]::SemiBold
     $heading.Margin = [Windows.Thickness]::new(0, 0, 0, 12)
     [void]$panel.Children.Add($heading)
 
+    if ($ActionDescription) {
+        $description = [Windows.Controls.TextBlock]::new()
+        $description.Text = $ActionDescription
+        $description.TextWrapping = [Windows.TextWrapping]::Wrap
+        $description.Margin = [Windows.Thickness]::new(0, 0, 0, 8)
+        [void]$panel.Children.Add($description)
+    }
+    $destinationLabel = [Windows.Controls.TextBlock]::new()
+    $destinationLabel.Text = "目标：$Destination"
+    $destinationLabel.TextWrapping = [Windows.TextWrapping]::Wrap
+    $destinationLabel.Margin = [Windows.Thickness]::new(0, 0, 0, 12)
+    [void]$panel.Children.Add($destinationLabel)
+
     $details = [Windows.Controls.TextBlock]::new()
     $details.Text = "Authorization: $AuthorizationId`nAction digest: $ActionDigest`nDestination: $Destination`nCommand: $CommandSummary"
+    if ($HostKeyAlias) {
+        $details.Text += "`nHostKeyAlias: $HostKeyAlias"
+    }
     $details.TextWrapping = [Windows.TextWrapping]::Wrap
     $details.Margin = [Windows.Thickness]::new(0, 0, 0, 16)
-    [void]$panel.Children.Add($details)
+    $detailScroll = [Windows.Controls.ScrollViewer]::new()
+    $detailScroll.MaxHeight = 180
+    $detailScroll.VerticalScrollBarVisibility = 'Auto'
+    $detailScroll.Content = $details
+    $expander = [Windows.Controls.Expander]::new()
+    $expander.Header = '技术详情（动作摘要与执行入口）'
+    $expander.IsExpanded = $false
+    $expander.Content = $detailScroll
+    $expander.Margin = [Windows.Thickness]::new(0, 0, 0, 16)
+    [void]$panel.Children.Add($expander)
 
     $firstLabel = [Windows.Controls.TextBlock]::new()
     $firstLabel.Text = '输入密码'
@@ -339,6 +434,11 @@ function Show-MaskedCredentialDialog {
     $secondBox.Margin = [Windows.Thickness]::new(0, 4, 0, 16)
     [void]$panel.Children.Add($secondBox)
 
+    $feedback = [Windows.Controls.TextBlock]::new()
+    $feedback.Text = ''
+    $feedback.Margin = [Windows.Thickness]::new(0, 0, 0, 12)
+    [void]$panel.Children.Add($feedback)
+
     $notice = [Windows.Controls.TextBlock]::new()
     $notice.Text = '密码不会写入 argv、environment、日志或文件；仍会短暂存在当前用户进程内存，并经 SSH 加密通道传输。'
     $notice.TextWrapping = [Windows.TextWrapping]::Wrap
@@ -350,42 +450,115 @@ function Show-MaskedCredentialDialog {
     $buttons.HorizontalAlignment = [Windows.HorizontalAlignment]::Right
     $cancelButton = [Windows.Controls.Button]::new()
     $cancelButton.Content = '取消'
+    $cancelButton.IsCancel = $true
     $cancelButton.MinWidth = 90
     $cancelButton.Margin = [Windows.Thickness]::new(0, 0, 8, 0)
     $confirmButton = [Windows.Controls.Button]::new()
     $confirmButton.Content = '确认并执行一次'
+    $confirmButton.IsEnabled = $false
     $confirmButton.MinWidth = 130
     [void]$buttons.Children.Add($cancelButton)
     [void]$buttons.Children.Add($confirmButton)
     [void]$panel.Children.Add($buttons)
 
-    $state = @{ Status = 'CANCELLED'; Secret = $null }
-    $confirmButton.Add_Click({
-        $pair = Resolve-SecureInputPair -First $firstBox.SecurePassword -Second $secondBox.SecurePassword
+    $state = @{ Status = 'CANCELLED'; Secret = $null; Completed = $false; Modal = $false; ValidationStatus = 'NOT_VALIDATED' }
+    $resolvePair = ${function:Resolve-SecureInputPair}
+    $updateValidation = {
+        if ($state.Completed) { return }
+        $pair = & $resolvePair -First $firstBox.SecurePassword -Second $secondBox.SecurePassword -ValidateOnly
+        $state.ValidationStatus = $pair.Status
+        $confirmButton.IsEnabled = ($pair.Status -eq 'SUCCESS')
+        switch ($pair.Status) {
+            'SUCCESS' { $feedback.Text = '两次输入一致'; $feedback.Foreground = [Windows.Media.Brushes]::DarkGreen }
+            'MISMATCH' { $feedback.Text = '两次输入不一致'; $feedback.Foreground = [Windows.Media.Brushes]::Firebrick }
+            default { $feedback.Text = '请填写两次密码'; $feedback.Foreground = [Windows.Media.Brushes]::DimGray }
+        }
+    }.GetNewClosure()
+    $firstBox.Add_PasswordChanged($updateValidation)
+    $secondBox.Add_PasswordChanged($updateValidation)
+    $submit = {
+        if ($state.Completed) { return }
+        & $updateValidation
+        if ($state.ValidationStatus -ne 'SUCCESS') { return }
+        # 前台状态只用于交互；真正接受仍使用原来的安全校验和只读副本。
+        $pair = & $resolvePair -First $firstBox.SecurePassword -Second $secondBox.SecurePassword
+        if ($pair.Status -ne 'SUCCESS') {
+            if ($null -ne $pair.Secret) { $pair.Secret.Dispose() }
+            & $updateValidation
+            return
+        }
+        $state.Completed = $true
         $state.Status = $pair.Status
         $state.Secret = $pair.Secret
-        $window.DialogResult = ($pair.Status -eq 'SUCCESS')
-        $window.Close()
-    })
-    $cancelButton.Add_Click({
+        if ($state.Modal) { $window.DialogResult = ($pair.Status -eq 'SUCCESS') }
+        else { $window.Close() }
+    }.GetNewClosure()
+    $cancel = {
+        if ($state.Completed) { return }
+        $state.Completed = $true
         $state.Status = 'CANCELLED'
-        $window.DialogResult = $false
-        $window.Close()
-    })
+        if ($state.Modal) { $window.DialogResult = $false }
+        else { $window.Close() }
+    }.GetNewClosure()
+    $confirmButton.Add_Click($submit)
+    $cancelButton.Add_Click($cancel)
+    # 第一框无 Enter 绑定，也不设置全局默认确认；Tab 使用原生顺序。
+    $secondBox.Add_PreviewKeyDown({
+        param($sender, $eventArgs)
+        if ($eventArgs.Key -eq [Windows.Input.Key]::Return) {
+            $eventArgs.Handled = $true
+            if (-not $eventArgs.IsRepeat) { & $submit }
+        }
+    }.GetNewClosure())
+    $window.Add_PreviewKeyDown({
+        param($sender, $eventArgs)
+        if ($eventArgs.Key -eq [Windows.Input.Key]::Escape) {
+            $eventArgs.Handled = $true
+            & $cancel
+        }
+    }.GetNewClosure())
     $window.Add_ContentRendered({
         [void]$window.Activate()
         [void]$firstBox.Focus()
-    })
-    $window.Content = $panel
+    }.GetNewClosure())
+    $window.Add_Closed({ $state.Completed = $true }.GetNewClosure())
+    $outer = [Windows.Controls.ScrollViewer]::new()
+    $outer.VerticalScrollBarVisibility = 'Auto'
+    $outer.Content = $panel
+    $window.Content = $outer
+    [pscustomobject]@{
+        Window = $window; FirstBox = $firstBox; SecondBox = $secondBox
+        ConfirmButton = $confirmButton; CancelButton = $cancelButton; State = $state
+        Heading = $heading; DetailsExpander = $expander; DetailsScroll = $detailScroll
+        Feedback = $feedback
+    }
+}
 
+function Show-MaskedCredentialDialog {
+    param(
+        [Parameter(Mandatory)][string]$AuthorizationId,
+        [Parameter(Mandatory)][string]$ActionDigest,
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][string]$CommandSummary,
+        [Parameter()][AllowEmptyString()][string]$HostKeyAlias = '',
+        [Parameter()][AllowEmptyString()][string]$ActionTitle = '仅为下列已授权动作输入本次 sudo 密码',
+        [Parameter()][AllowEmptyString()][string]$ActionDescription = ''
+    )
+
+    $dialog = New-MaskedCredentialDialog @PSBoundParameters
+    $dialog.State.Modal = $true
     try {
-        [void]$window.ShowDialog()
+        [void]$dialog.Window.ShowDialog()
+    }
+    catch {
+        if ($null -ne $dialog.State.Secret) { $dialog.State.Secret.Dispose() }
+        throw
     }
     finally {
-        $firstBox.Clear()
-        $secondBox.Clear()
+        $dialog.FirstBox.Clear()
+        $dialog.SecondBox.Clear()
     }
-    [pscustomobject]@{ Status = $state.Status; Secret = $state.Secret }
+    [pscustomobject]@{ Status = $dialog.State.Status; Secret = $dialog.State.Secret }
 }
 
 function ConvertTo-PosixSingleQuoted {
@@ -434,9 +607,11 @@ function New-SshProcessStartInfo {
         [Parameter(Mandatory)][string]$KnownHostsFile,
         [Parameter()][AllowEmptyString()][string]$IdentityFile = '',
         [Parameter(Mandatory)][string]$RemoteHelperPath,
-        [Parameter()][ValidateRange(1, 16777216)][int]$MaxOutputBytes = 1048576
+        [Parameter()][ValidateRange(1, 16777216)][int]$MaxOutputBytes = 1048576,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$HostKeyAlias
     )
 
+    $normalizedAlias = Resolve-HostKeyAlias -Value $HostKeyAlias -Specified $PSBoundParameters.ContainsKey('HostKeyAlias')
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $SshPath
     $startInfo.UseShellExecute = $false
@@ -461,6 +636,9 @@ function New-SshProcessStartInfo {
         '-o', "UserKnownHostsFile=$KnownHostsFile",
         '-o', 'LogLevel=ERROR'
     )
+    if ($normalizedAlias) {
+        $arguments += @('-o', "HostKeyAlias=$normalizedAlias")
+    }
     if ($IdentityFile) {
         $arguments += @('-i', $IdentityFile, '-o', 'IdentitiesOnly=yes')
     }
@@ -842,7 +1020,10 @@ function Invoke-SolisMaskedSudoOverSsh {
         [Parameter(Mandatory)][string]$KnownHostsFile,
         [Parameter()][AllowEmptyString()][string]$IdentityFile = '',
         [Parameter()][ValidateRange(1, 3600)][int]$TimeoutSeconds = 120,
-        [Parameter()][ValidateRange(1, 16777216)][int]$MaxOutputBytes = 1048576
+        [Parameter()][ValidateRange(1, 16777216)][int]$MaxOutputBytes = 1048576,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$HostKeyAlias,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$ActionTitle,
+        [Parameter()][AllowNull()][AllowEmptyString()][string]$ActionDescription
     )
 
     if ($ExpectedActionDigest -notmatch '^[A-Fa-f0-9]{64}$') {
@@ -859,6 +1040,18 @@ function Invoke-SolisMaskedSudoOverSsh {
         IdentityFile = $IdentityFile
         TimeoutSeconds = $TimeoutSeconds
         MaxOutputBytes = $MaxOutputBytes
+    }
+    $aliasParameters = @{}
+    if ($PSBoundParameters.ContainsKey('HostKeyAlias')) {
+        $aliasParameters.HostKeyAlias = $HostKeyAlias
+        $digestParameters.HostKeyAlias = $HostKeyAlias
+    }
+    $presentationParameters = @{}
+    foreach ($name in @('ActionTitle', 'ActionDescription')) {
+        if ($PSBoundParameters.ContainsKey($name)) {
+            $presentationParameters[$name] = $PSBoundParameters[$name]
+            $digestParameters[$name] = $PSBoundParameters[$name]
+        }
     }
     $actualDigest = New-SolisSudoActionDigest @digestParameters
     if (-not (Test-DigestEqual -Expected $ExpectedActionDigest -Actual $actualDigest)) {
@@ -894,13 +1087,13 @@ function Invoke-SolisMaskedSudoOverSsh {
         -KnownHostsFile $KnownHostsFile `
         -IdentityFile $IdentityFile `
         -RemoteHelperPath $remoteHelperPath `
-        -MaxOutputBytes $MaxOutputBytes
+        -MaxOutputBytes $MaxOutputBytes @aliasParameters
     $commandSummary = (@($TargetCommand) + @($TargetArgument)) -join ' '
     $dialog = Show-MaskedCredentialDialog `
         -AuthorizationId $AuthorizationId `
         -ActionDigest $actualDigest `
         -Destination "$UserName@$HostName`:$Port" `
-        -CommandSummary $commandSummary
+        -CommandSummary $commandSummary @aliasParameters @presentationParameters
     if ($dialog.Status -ne 'SUCCESS') {
         throw "MASKED_INPUT_$($dialog.Status)"
     }
@@ -911,7 +1104,8 @@ function Invoke-SolisMaskedSudoOverSsh {
             throw 'ACTION_IDENTITY_DRIFT_AFTER_INPUT'
         }
         $encodedStreamLimit = 4L * [long][Math]::Ceiling($MaxOutputBytes / 3.0)
-        $transportStdOutLimit = [checked][int](4L * $encodedStreamLimit + 8192L)
+        # MaxOutputBytes is range-bound; PowerShell's int conversion rejects overflow.
+        $transportStdOutLimit = [int](4L * $encodedStreamLimit + 8192L)
         $transport = Invoke-ProcessWithSecret `
             -StartInfo $startInfo `
             -Secret $dialog.Secret `

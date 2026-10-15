@@ -111,6 +111,123 @@ Describe 'Masked sudo over SSH contract' {
         $changed | Should Not Be $first
     }
 
+    Context 'Explicit HostKeyAlias contract' {
+        It 'keeps the legacy record and argv when HostKeyAlias is omitted' {
+            $record = & $module { param($action) Get-ActionRecord @action -IdentityFile '' -TimeoutSeconds 120 -MaxOutputBytes 1048576 } $commonAction
+            ($record.Keys -join ',') | Should Be 'schema_version,authorization_id,host_name,user_name,port,target_command,target_arguments,known_hosts_file,known_hosts_sha256,identity_file,identity_file_state,identity_file_length,identity_file_mtime,timeout_seconds,max_output_bytes,ssh_path,ssh_sha256,remote_helper_sha256'
+            $sshAction = $commonAction.Clone()
+            $sshAction.Remove('AuthorizationId')
+            $info = & $module { param($action, $helper) New-SshProcessStartInfo @action -SshPath 'C:\synthetic\ssh.exe' -RemoteHelperPath $helper } $sshAction $remoteHelperPath
+            @($info.ArgumentList | Where-Object { $_ -like 'HostKeyAlias=*' }).Count | Should Be 0
+        }
+
+        It 'binds the exact alias and emits one independent option after disabling config' {
+            $record = & $module { param($action) Get-ActionRecord @action -IdentityFile '' -TimeoutSeconds 120 -MaxOutputBytes 1048576 -HostKeyAlias fnos } $commonAction
+            $record.host_key_alias | Should Be 'fnos'
+            $sshAction = $commonAction.Clone()
+            $sshAction.Remove('AuthorizationId')
+            $info = & $module { param($action, $helper) New-SshProcessStartInfo @action -SshPath 'C:\synthetic\ssh.exe' -RemoteHelperPath $helper -HostKeyAlias fnos } $sshAction $remoteHelperPath
+            $argv = @($info.ArgumentList)
+            $argv[0] | Should Be '-F'
+            $argv[1] | Should Be 'NUL'
+            @($argv | Where-Object { $_ -ceq 'HostKeyAlias=fnos' }).Count | Should Be 1
+            $argv[[Array]::IndexOf($argv, 'HostKeyAlias=fnos') - 1] | Should Be '-o'
+            ($argv -contains 'StrictHostKeyChecking=yes') | Should Be $true
+            ($argv -contains "UserKnownHostsFile=$knownHostsPath") | Should Be $true
+        }
+
+        It 'makes different aliases and omission distinct digests without case folding' {
+            $legacy = New-SolisSudoActionDigest @commonAction
+            $lower = New-SolisSudoActionDigest @commonAction -HostKeyAlias fnos
+            $upper = New-SolisSudoActionDigest @commonAction -HostKeyAlias FNOS
+            $other = New-SolisSudoActionDigest @commonAction -HostKeyAlias other
+            $lower | Should Not Be $legacy
+            $upper | Should Not Be $lower
+            $other | Should Not Be $lower
+            (New-SolisSudoActionDigest @commonAction -HostKeyAlias fnos) | Should Be $lower
+        }
+
+        It 'accepts bounded ASCII tokens without changing their bytes' {
+            foreach ($alias in @('a', 'Fnos_1.example-2', ('a' * 253))) {
+                $record = & $module { param($action, $value) Get-ActionRecord @action -IdentityFile '' -TimeoutSeconds 120 -MaxOutputBytes 1048576 -HostKeyAlias $value } $commonAction $alias
+                $record.host_key_alias | Should Be $alias
+            }
+        }
+
+        It 'rejects empty, controls, whitespace, option and shell injections at every entry' {
+            $sshAction = $commonAction.Clone()
+            $sshAction.Remove('AuthorizationId')
+            $invalidAliases = @('', $null, "fnos`r", "fnos`n", "fnos$([char]0)", "fnos`t", ' fnos', 'fnos ', '-oProxyCommand=evil', 'fnos -o StrictHostKeyChecking=no', 'fnos=evil', 'fnos;evil', 'fnos"', "fnos'", 'fnos/evil', 'fnos\evil', 'fnos*', 'fnos,evil', 'fnos:22', '测试', ('a' * 254))
+            $invalidAliases.Count | Should Be 21
+            foreach ($alias in $invalidAliases) {
+                { New-SolisSudoActionDigest @commonAction -HostKeyAlias $alias } | Should Throw 'SSH_HOST_KEY_ALIAS_INVALID'
+                { Invoke-SolisMaskedSudoOverSsh @commonAction -HostKeyAlias $alias -ExpectedActionDigest ('0' * 64) } | Should Throw 'SSH_HOST_KEY_ALIAS_INVALID'
+                { & $module { param($action, $helper, $value) New-SshProcessStartInfo @action -SshPath 'C:\synthetic\ssh.exe' -RemoteHelperPath $helper -HostKeyAlias $value } $sshAction $remoteHelperPath $alias } | Should Throw 'SSH_HOST_KEY_ALIAS_INVALID'
+            }
+        }
+
+        It 'blocks alias addition, removal and drift before GUI or transport' {
+            Mock Test-WpfAvailable { throw 'UNEXPECTED_WPF_WORK' } -ModuleName $module.Name
+            Mock Show-MaskedCredentialDialog { throw 'UNEXPECTED_GUI' } -ModuleName $module.Name
+            Mock Invoke-ProcessWithSecret { throw 'UNEXPECTED_PROCESS' } -ModuleName $module.Name
+            $approved = New-SolisSudoActionDigest @commonAction -HostKeyAlias fnos
+            $legacy = New-SolisSudoActionDigest @commonAction
+            { Invoke-SolisMaskedSudoOverSsh @commonAction -HostKeyAlias other -ExpectedActionDigest $approved } | Should Throw 'ACTION_IDENTITY_DRIFT'
+            { Invoke-SolisMaskedSudoOverSsh @commonAction -ExpectedActionDigest $approved } | Should Throw 'ACTION_IDENTITY_DRIFT'
+            { Invoke-SolisMaskedSudoOverSsh @commonAction -HostKeyAlias fnos -ExpectedActionDigest $legacy } | Should Throw 'ACTION_IDENTITY_DRIFT'
+            Assert-MockCalled Test-WpfAvailable -ModuleName $module.Name -Times 0 -Exactly -Scope It
+            Assert-MockCalled Show-MaskedCredentialDialog -ModuleName $module.Name -Times 0 -Exactly -Scope It
+            Assert-MockCalled Invoke-ProcessWithSecret -ModuleName $module.Name -Times 0 -Exactly -Scope It
+        }
+
+        It 'shows the alias in action confirmation and carries it to the guarded transport' {
+            Mock Test-WpfAvailable { $true } -ModuleName $module.Name
+            Mock Test-GuiRuntimeContract { [pscustomobject]@{ Status = 'PASS' } } -ModuleName $module.Name
+            Mock Show-MaskedCredentialDialog {
+                $secret = [Security.SecureString]::new()
+                $secret.AppendChar('x')
+                $secret.MakeReadOnly()
+                [pscustomobject]@{ Status = 'SUCCESS'; Secret = $secret }
+            } -ModuleName $module.Name
+            Mock Invoke-ProcessWithSecret {
+                [pscustomobject]@{ ExitCode = 0; StdOut = "SOLIS_SUDO_V1 SUDO_STDOUT `nSOLIS_SUDO_V1 SUDO_STDERR `nSOLIS_SUDO_V1 TARGET_STDOUT `nSOLIS_SUDO_V1 TARGET_STDERR `nSOLIS_SUDO_V1 RESULT sudo_exit=0 target_started=1 target_exit=0"; StdErr = ''; OutputLimitExceeded = $false }
+            } -ModuleName $module.Name
+            $approved = New-SolisSudoActionDigest @commonAction -HostKeyAlias fnos
+            $result = Invoke-SolisMaskedSudoOverSsh @commonAction -HostKeyAlias fnos -ExpectedActionDigest $approved
+            $result.Result | Should Be 'PASS'
+            Assert-MockCalled Show-MaskedCredentialDialog -ModuleName $module.Name -Times 1 -Exactly -Scope It -ParameterFilter { $HostKeyAlias -ceq 'fnos' -and $Destination -ceq 'operator@synthetic.example:22' -and $ActionDigest -match '^[a-f0-9]{64}$' }
+            Assert-MockCalled Invoke-ProcessWithSecret -ModuleName $module.Name -Times 1 -Exactly -Scope It -ParameterFilter { @($StartInfo.ArgumentList | Where-Object { $_ -ceq 'HostKeyAlias=fnos' }).Count -eq 1 }
+        }
+
+        It 'blocks post-input identity drift and disposes synthetic input without transport' {
+            $aliasTestState = @{ Secret = [Security.SecureString]::new(); KnownHostsPath = $knownHostsPath }
+            $aliasTestState.Secret.AppendChar('x')
+            & $module { param($state) $script:AliasTestState = $state } $aliasTestState
+            Mock Test-WpfAvailable { $true } -ModuleName $module.Name
+            Mock Test-GuiRuntimeContract { [pscustomobject]@{ Status = 'PASS' } } -ModuleName $module.Name
+            Mock Show-MaskedCredentialDialog {
+                $state = & (Get-Module Invoke-MaskedSudoOverSsh) { $script:AliasTestState }
+                [IO.File]::WriteAllText($state.KnownHostsPath, 'synthetic-drift-after-input')
+                [pscustomobject]@{ Status = 'SUCCESS'; Secret = $state.Secret }
+            } -ModuleName $module.Name
+            Mock Invoke-ProcessWithSecret { throw 'UNEXPECTED_PROCESS' } -ModuleName $module.Name
+            $approved = New-SolisSudoActionDigest @commonAction -HostKeyAlias fnos
+            try {
+                { Invoke-SolisMaskedSudoOverSsh @commonAction -HostKeyAlias fnos -ExpectedActionDigest $approved } | Should Throw 'ACTION_IDENTITY_DRIFT_AFTER_INPUT'
+                $disposed = $false
+                try { $aliasTestState.Secret.AppendChar('y') }
+                catch { $disposed = $true }
+                $disposed | Should Be $true
+                Assert-MockCalled Invoke-ProcessWithSecret -ModuleName $module.Name -Times 0 -Exactly -Scope It
+            }
+            finally {
+                [IO.File]::WriteAllText($knownHostsPath, 'synthetic.example ssh-ed25519 SYNTHETIC-BASELINE', $utf8NoBom)
+                $aliasTestState.Secret.Dispose()
+                & $module { Remove-Variable -Name AliasTestState -Scope Script -ErrorAction SilentlyContinue }
+            }
+        }
+    }
+
     It 'changes the action digest when known_hosts content drifts' {
         $baseline = New-SolisSudoActionDigest @commonAction
         try {

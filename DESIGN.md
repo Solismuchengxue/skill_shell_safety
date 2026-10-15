@@ -26,6 +26,10 @@
 
 `New-SolisSudoActionDigest` 先绑定 authorization ID、destination、absolute target argv、timeout、`MaxOutputBytes`、固定 OpenSSH/helper hashes、`known_hosts` hash 与可选 identity file metadata。`Invoke-SolisMaskedSudoOverSsh` 在 GUI 前校验一次，用户确认后再校验一次，封闭输入期间的 identity/command/output-policy drift。
 
+显式可选 `HostKeyAlias` 通过单一安全 token 验证原样追加到 action record，传入 GUI 确认及结构化 `-o` 参数；不读取配置，不改变 host-key 验证策略。未传入时不添加字段或 option，保留原 digest 序列化与参数合同；值域和错误由 [中文操作参考](skills/powershell-bash-safety/references/zh-CN.md#显式-hostkeyalias)统一定义。
+
+对话框统一在 module 内构造，由公开 `ActionTitle`/`ActionDescription` 传递 non-secret 纯文本并按显式字段绑定 digest；消费方不再需要 AST 字符串替换。固定 680×600 布局、折叠技术详情/180 高滚动区和外层滚动沿用已确认版本；第一框 Tab，第二框 Enter 与按钮共用确认，Esc 取消，无全局默认提交。两框变化时用 SecurePassword 临时验证，非空且一致才启用确认，空值/不一致留窗；最终接受仍通过原安全比较并产生只读副本。按用户决定不提供眼睛显示。详细规则见 [对话框合同](skills/powershell-bash-safety/references/zh-CN.md#原版对话框布局与键盘)。
+
 WPF window 只在 PowerShell 7 STA、interactive Windows session 中启用；两个 `PasswordBox.SecurePassword` 只通过 BSTR code units 比较，不构造完整 plaintext managed string。接受值从 BSTR 进入可清理 `char[]`/UTF-8 `byte[]`，由 stdin `BaseStream` 写入并以单独 LF 终止；SSH `ArgumentList` 禁止 PTY 与 SSH interactive authentication fallback。remote helper 使用 FIFO drain target/sudo streams，target stdin 固定 `/dev/null`；outer SSH user 在 sudo 前创建 mode `0600` status file，避免依赖 root 新建文件的可读性。四个 remote streams 各自受 `MaxOutputBytes` 硬上限约束，Windows transport 也以派生上限并发读取 stdout/stderr；超限返回 `OUTPUT_LIMIT_EXCEEDED`。工作根只包含 FIFO 与 non-secret exit status，并由 trap 精确清理。
 
 返回对象分别保留 `Ssh`、`Sudo`、`Target` 的 exit code/stdout/stderr。protocol 完整不等于 target 成功；真实 GUI foreground、SSH authentication、sudo policy 和 target runtime 都是独立 Target evidence。
@@ -67,11 +71,12 @@ flowchart LR
 1. `quick_validate.py` 验证 Skill 包结构。
 2. 新 PowerShell 脚本先由既有 AST 验证门检查，再由规范适配器自检；两个 syntax adapter 规格测试共 28 个测试样本，覆盖有效/无效、字节、计数、去重/跳过、ReparsePoint、方言/后端身份、工具缺失、Text/Json、顶层错误与退出码。
 3. `Test-ConsumerDepth.Tests.ps1` 以 8 个离线合同测试验证三类角色、Fast/Milestone/Target 选择、WSL 显式验证门、只读审查者边界和可移植包零任务引用泄漏。
-4. `Test-MaskedSudoOverSsh.Tests.ps1` 以 29 个 synthetic tests 覆盖 action/identity/output-policy drift、STA/WPF/session、cancel/empty/mismatch、structured argv、无 console fallback、长 Unicode sentinel、SSH start failure、remote preflight、status ownership、双层输出硬上限、三层 protocol 与 FIFO cleanup。
-5. PowerShell AST、Bash `-n`、POSIX sh `-n` 分别验证至少一个非空样本。
-6. 检查引用路径、UTF-8、BOM、尾空白。
-7. 安装同步时比较相对文件集、长度、字节和 SHA-256。
-8. 修改后检查范围、差异与未授权部署副作用。
+4. `Test-MaskedSudoOverSsh.Tests.ps1` 以 37 个 synthetic tests 覆盖 action/identity/output-policy drift、STA/WPF/session、cancel/empty/mismatch、structured argv、无 console fallback、长 Unicode sentinel、SSH start failure、remote preflight、status ownership、双层输出硬上限、三层 protocol 与 FIFO cleanup；其中 8 项新增 HostKeyAlias 合同回归包含 21 种非法输入、缺省兼容、精确 argv/摘要、GUI 参数传递及输入前后阻断/清理。
+5. `Test-MaskedDialogUi.Tests.ps1` 的 18 项测试覆盖展示字段/digest/前置阻断与传递、只验证模式的临时安全对象释放，并用 12 个只构造 UI 的 STA WPF 假口令场景验证布局、第一框 Enter、Tab、第二框 Enter、点击、空值/不一致留窗、原位改正、重新禁用、Esc/关闭取消和重复确认；不调用 SSH。
+6. PowerShell AST、Bash `-n`、POSIX sh `-n` 分别验证至少一个非空样本。
+7. 检查引用路径、UTF-8、BOM、尾空白。
+8. 安装同步时比较相对文件集、长度、字节和 SHA-256。
+9. 修改后检查范围、差异与未授权部署副作用。
 
 ## 工具分层
 

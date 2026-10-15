@@ -25,6 +25,10 @@ $powershell-bash-safety
 
 一次性 sudo 路径先生成 exact action digest，取得对应 action-time authorization 后，才在固定 PowerShell 7 STA session 中显示 `PasswordBox.SecurePassword` GUI。GUI 前后都会复核 destination、absolute target argv、SSH/helper、`known_hosts`、可选 identity metadata 与 `MaxOutputBytes`；任何漂移、cancel、mismatch、GUI/SSH 前置失败、输出超限或 protocol 不完整都停止，不回退到普通终端或持久 SecretStore。具体合同与示例见 [中文操作参考](skills/powershell-bash-safety/references/zh-CN.md#6-一次性-sudo-遮蔽输入)。
 
+规范源码支持显式可选 `HostKeyAlias`，将已核对的安全 token 原样绑定到 digest、GUI 确认及 SSH argv，保留 `-F NUL` 下的 host-key 查询身份；未传入保持原合同。值域与停止条件见 [HostKeyAlias 合同](skills/powershell-bash-safety/references/zh-CN.md#显式-hostkeyalias)。
+
+对话框采用 680×600 布局、折叠技术详情和滚动，支持绑定摘要的 `ActionTitle`/`ActionDescription`；第一框 Tab 到第二框，第二框 Enter 确认，Esc 取消。输入时提供非空/一致性反馈，只有两次非空且一致才允许确认；有误时留窗修正。不提供眼睛按钮。假口令交互预览命令见 [对话框说明](skills/powershell-bash-safety/references/zh-CN.md#原版对话框布局与键盘)。
+
 ## 项目结构
 
 - `skills/powershell-bash-safety/`：权威 Skill package。

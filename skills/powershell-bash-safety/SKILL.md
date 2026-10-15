@@ -34,6 +34,8 @@ Gate 是条件式层级，不是每次全部执行，也不是拆成多张用户
 - 只接受固定 PowerShell 7、STA、Windows interactive desktop 与 WPF `PasswordBox.SecurePassword`；每次动作显示独立 topmost GUI。queued/未聚焦 PTY、普通终端、`Read-Host` 或 `open_in_codex` 都不是密码输入面。
 - 密码不进入 argv、environment、stdout、stderr、日志、PSReadLine 或文件。实现不构造完整 plaintext managed string；从 BSTR 填充可清理 `char[]`/UTF-8 `byte[]`，直接向 SSH stdin `BaseStream` 写入 payload 与单独 LF，并在各路径清理 buffers、BSTR 与 `SecureString`。
 - SSH 使用结构化 `ArgumentList`、禁用 PTY 与 SSH interactive password fallback；remote helper 通过 `sudo -S` 读取这一行，target stdin 固定为 `/dev/null`，并用内存/FIFO protocol 分层返回 SSH、sudo 与 target 的 exit code/stdout/stderr。non-secret target status 在 sudo 前由 outer SSH user 创建，不依赖 root 新建 regular file。
+- 若已核对的 SSH 配置要求 `HostKeyAlias`，调用方须向两个公开入口显式传入同一值；模块不解析配置。安全 token 原样绑定到 digest、GUI 确认和单独 `-o HostKeyAlias=...`，因此 `-F NUL` 不会丢弃它。未传入保留原 digest/argv；非法值或 alias 漂移在 GUI/SSH 启动前失败，完整值域见中文操作参考。
+- 可选 `ActionTitle`、`ActionDescription` 是 non-secret 纯文本，须在生成 digest 前加入同一 action，并原样传给执行入口；不从标题构造代码，也不由消费方 AST 改写窗口。原版采用 680×600 固定布局、默认折叠技术详情（180 高滚动区）及外层滚动；第一框通过 Tab 到第二框，仅第二框 Enter 复用点击确认路径，Esc 取消。初始不报错；输入变化时以 SecurePassword 临时比较，非空且一致才允许确认，空值/不一致留窗修正；最终仍走原安全校验。按用户决定不提供眼睛显示，不改变无完整明文字符串合同。
 - `MaxOutputBytes` 默认 `1048576`、允许 `1..16777216`，对四个 remote streams 分别形成硬上限；Windows SSH transport 另以派生的 stdout 上限和同值 stderr 上限并发读取。任一层超限都 fail closed 为 `OUTPUT_LIMIT_EXCEEDED`，不得无界缓冲。
 - cancel、empty、mismatch、GUI/session 不可用、前置文件/ReparsePoint、action drift、SSH start/timeout、输出超限或 remote protocol 不完整时 fail closed；不回退到 echo pipe、argv/env、plaintext temp file、DPAPI、SecretStore 或普通终端，也不自动 retry。
 - 该方式只减少屏幕回显与意外历史记录；值仍短暂存在当前用户进程内存并经 SSH 加密通道传输。真实 SSH、sudo policy、目标命令和 GUI 可见性仍需在获授权的 Target 里分别验证。

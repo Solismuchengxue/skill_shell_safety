@@ -76,9 +76,12 @@ flowchart LR
 
 关键合同：
 
+- 原版 GUI 由 `New-MaskedCredentialDialog` 构造，`Show-MaskedCredentialDialog` 管理模态展示和输入框清理；二者均为 module 私有实现，不增加公开 exports。显式 `ActionTitle`/`ActionDescription` 原样进入摘要并作为纯文本显示，缺省不增加 record 字段；消费方不通过 AST 改写窗口。固定 680×600、折叠详情和键盘规则见 [对话框合同](../skills/powershell-bash-safety/references/zh-CN.md#原版对话框布局与键盘)。
+- 输入变化的前台校验复用 `Resolve-SecureInputPair -ValidateOnly`，只返回状态并释放两个临时 SecureString/BSTR，不创建接受用 secret 副本。空值/不一致留窗、确认禁用；进入共用确认路径时重验，并继续执行原最终校验，只有最终成功才设置 Completed 并关闭。此输入修正不改变执行后 fail-closed/无自动 retry 合同。
+
 - GUI 只读取两个 `PasswordBox.SecurePassword`，cancel、empty、mismatch、non-Windows、MTA、session 0 或 WPF unavailable 均停止；没有 terminal fallback。
-- action digest 绑定 authorization ID、host/user/port、absolute target argv、timeout、`MaxOutputBytes`、OpenSSH/helper SHA-256、`known_hosts` SHA-256 和可选 identity file 的 path/length/UTC mtime。private key 内容不由 helper 读取。
-- OpenSSH 关闭 config file、PTY、password/keyboard-interactive prompt 与重试；host key 必须由显式 `known_hosts` 验证。target command 通过确定性 POSIX single-quote contract 进入固定 remote helper，不拼接动态 shell program。
+- action digest 绑定 authorization ID、host/user/port、absolute target argv、timeout、`MaxOutputBytes`、OpenSSH/helper SHA-256、`known_hosts` SHA-256 和可选 identity file 的 path/length/UTC mtime。显式可选 `HostKeyAlias` 通过单一安全 token 验证后原样追加为 `host_key_alias`，不 trim 或改大小写；未传入保持原 record/digest。private key 内容不由 helper 读取。
+- OpenSSH 使用 `-F NUL` 关闭 config file、PTY、password/keyboard-interactive prompt 与重试；host key 必须由显式 `known_hosts` 验证。调用方从已核对配置明确提供 HostKeyAlias 时，同一值参与 GUI 动作确认并且只加入一组独立 `-o HostKeyAlias=...`；模块不解析配置或降低 `StrictHostKeyChecking=yes`。非法值/alias drift 在 GUI 和启动前失败；完整值域与错误见 [合同说明](../skills/powershell-bash-safety/references/zh-CN.md#显式-hostkeyalias)。target command 通过确定性 POSIX single-quote contract 进入固定 remote helper，不拼接动态 shell program。
 - 值仅短暂存在 WPF/SecureString/BSTR/stream buffers；BSTR 由 `ZeroFreeBSTR` 清理，接受值在所有路径 `Dispose()`。remote work root 不含密码，只含 FIFO 与 outer SSH user 在 sudo 前创建的 non-secret target status，并由 trap 精确删除。
 - remote 四个输出流各自最多保留 `MaxOutputBytes`；reader 在截断后继续 drain FIFO，Windows transport 同时对 SSH stdout/stderr 设硬上限，均不使用无界 `ReadToEndAsync`。任一层超限统一 `ErrorLayer=OutputLimit`、`FailureCode=OUTPUT_LIMIT_EXCEEDED`。
 - remote protocol 完整时 SSH transport exit 为 0；sudo 与 target exit 另行报告。target 失败不改标为 SSH 失败，protocol 缺失也不冒充 target 结果。
