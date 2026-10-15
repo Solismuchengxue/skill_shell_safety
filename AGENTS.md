@@ -10,6 +10,12 @@
 - 本项目已通过 `$swift-cycle` v1.3.0 完成首次采用；持久绑定只作用于本项目，不修改或复制 Swift Cycle，也不修改相邻仓库及其工作树。
 - 本 Skill 只提供 PowerShell、SSH、Bash、POSIX sh、archive、transport 与 container 执行链的防错和验证方法，不扩大远程写入、部署、服务中断或凭据权限。
 
+## 项目任务治理
+
+- 当前项目只保留一个负责人 L1；旧固定审查者已退役。
+- 后续独立审查不作为固定项目角色，仅在用户、部长或项目规则明确要求时按需建立。
+- 该角色调整不自动授予 Git push、发布、部署、运行态、凭据、费用或删除权限；这些动作继续遵守各自的 action-time authorization。
+
 ## 修改规则
 
 - 修改前阅读 `docs/blueprint.md`、`README.md`、`DESIGN.md`、`docs/architecture.md`、当前 `SKILL.md` 及本文件。
