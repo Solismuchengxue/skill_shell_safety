@@ -6,7 +6,7 @@
 - 项目意图权威：[docs/blueprint.md](docs/blueprint.md)。
 - 规范 Skill：`skills/shell-safety/`。
 - 用户级安装目录是独立安装镜像，不是源码权威。
-- 项目根名称为 `skill_shell_safety`，源码 identifier 为 `shell-safety`；当前独立安装 `.agents/skills/shell-safety` 已与规范包 byte-exact 对齐，并通过本轮 Desktop 的新 ID 发现和全文加载核验。额外完整重启、GUI 与真实目标运行的未验边界统一见架构说明。
+- 项目根名称为 `skill_shell_safety`，源码 identifier 为 `shell-safety`；当前独立安装 `.agents/skills/shell-safety` 已与规范包 byte-exact 对齐，并通过新 ID 发现和全文加载核验；本次重启后的权限/根有限复验已通过。该次观察的证据边界及 GUI、真实目标运行的未验范围统一见 [架构说明](docs/architecture.md#状态与用途)。
 - 规范源码与用户级安装镜像保持独立；只有完成显式逐字节同步与验证，才能声明某一安装快照与源码一致。
 - 2026-09-23 的 `INSTALLED_LOAD_VERIFIED` 是旧 ID 固定安装的历史验收，不代表当前新 ID 已作为 tag/Release 发布。历史制品身份及更新流程统一见 [固定版本交付与更新回退](docs/architecture.md#固定版本交付与更新回退)。
 

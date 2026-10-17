@@ -53,7 +53,7 @@ $shell-safety
 
 ## 当前限制
 
-当前独立安装为 `shell-safety`，8 文件、101232 bytes，与规范包逐字节及 SHA-256 一致；当前 Desktop 回合已发现并全文加载新 Skill。此文件/发现层结论不等于运行验收；修正冷启动权限与 roots 后的第二次完整 Desktop 重启、12 项 WPF 场景及真实 SSH/sudo 均未在本次命名交付中运行。
+当前独立安装为 `shell-safety`，8 文件、101232 bytes，与规范包逐字节及 SHA-256 一致，已通过新 ID 发现与全文加载核验。本次命名迁移的重启后权限/根有限复验已通过，但仅覆盖本次观察，不证明未来所有重启均稳定或业务运行通过；本次迁移未运行 12 项 WPF 场景及真实 SSH/sudo。详细边界见 [架构说明](docs/architecture.md#状态与用途)。
 
 本次新 identifier/路径通过 `main` 交付；历史 `v1.1.0` 固定提交 `04c437eeac4ff8d4f5d14340d5aa56e6a0ec69ba`，归档仍使用旧 `powershell-bash-safety` 包路径，不包含 `skills/shell-safety/`，不能把旧 tag/资产称为新 ID 版本。固定制品身份、导出/验证、显式更新与回退流程见 [架构说明](docs/architecture.md#固定版本交付与更新回退)。
 

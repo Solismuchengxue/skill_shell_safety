@@ -6,7 +6,11 @@
 - 用途：定义 `shell-safety` 的多层解释模型、验证门、权威和停止条件。
 - 更新触发：新增解释器、凭据输入面、传输、归档、容器启动责任模式，或确认新的可复用失败原因。
 
-项目为 `skill_shell_safety` / `shell-safety`（Shell Safety / Shell 安全），权威源码位于 `skills/shell-safety/`。当前独立普通目录安装为 `.agents/skills/shell-safety`，8 文件/101232 bytes，与规范包的 relative set、bytes 和 SHA-256 一致；本轮 Desktop 已发现并全文加载新 Skill。初次冷启动的权限/roots 差异经同 ID 重绑与权限重选后已核修正，但修正后的第二次完整 Desktop 重启仍为 NOT_RUN；本次命名交付未运行 12 项 WPF 场景或真实 SSH/sudo。文件、发现、GUI 与目标运行结论不得相互替代。
+项目为 `skill_shell_safety` / `shell-safety`（Shell Safety / Shell 安全），权威源码位于 `skills/shell-safety/`。当前独立普通目录安装为 `.agents/skills/shell-safety`，8 文件/101232 bytes，与规范包的 relative set、bytes 和 SHA-256 一致，已通过新 ID 发现与全文加载核验。
+
+2026-10-17，本次命名迁移已通过重启后的权限/根有限复验：原项目与聊天身份保留，实际 cwd/Git 根均匹配新项目根；同一新回合的有效权限为 `workspace-write / on-request / auto_review`，显式可写范围仅本项目根与原可视化目录（系统临时路径另计，受保护子路径仍只读）。Agent 原回复未暴露的 approval_policy，由协调方核对同一新回合 turn_context 补证，不以全局 config 推断。
+
+此结论仅覆盖本次重启后的观察，不证明未来所有重启均稳定，也不改写此前阶段未测的历史记录。本次命名迁移未运行 12 项 WPF 场景或真实 SSH/sudo；文件、发现、权限/根、GUI 与目标运行结论不得相互替代。
 
 下文固定版本记录保留当时仓库、包根、ZIP 名称与哈希，不用新名称改写历史制品；现有 `v1.1.0` 固定在 `04c437eeac4ff8d4f5d14340d5aa56e6a0ec69ba`，其源码/资产仍为旧 ID 路径，不包含本次 `skills/shell-safety/` 命名交付。
 
