@@ -1,7 +1,7 @@
 #requires -Version 7.0
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$portableRoot = Join-Path $projectRoot 'skills\powershell-bash-safety'
+$portableRoot = Join-Path $projectRoot 'skills\shell-safety'
 $modulePath = Join-Path $portableRoot 'scripts\Invoke-MaskedSudoOverSsh.psm1'
 $remoteHelperPath = Join-Path $portableRoot 'scripts\Invoke-MaskedSudoOverSsh.Remote.sh'
 $fixturePath = Join-Path $PSScriptRoot 'fixtures\SyntheticSshTransport.ps1'

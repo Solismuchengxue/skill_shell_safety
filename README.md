@@ -1,6 +1,8 @@
-# PowerShell 与 Bash 安全执行
+# Shell Safety / Shell 安全
 
-`powershell-bash-safety` 是一个 Codex Skill，用于减少 PowerShell、SSH、Bash、POSIX sh、archive、文件传输与 container 启动链中的跨平台执行错误。
+`shell-safety` 是一个 Codex Skill，用于减少 PowerShell、SSH、Bash、POSIX sh、archive、文件传输与 container 启动链中的跨平台执行错误。
+
+权威 package 位于 `skills/shell-safety/`，用户级安装位置为 `~/.agents/skills/shell-safety`；源码与独立安装镜像分离，源码修改不会自动覆盖安装。历史 tag/Release 保留各自的原始制品身份。
 
 它把源码解析、参数绑定、制品字节、远端解释器和真实运行拆成独立 gate，帮助在进入高风险运行前发现 parameter set、quoting、EOL、shebang、checksum、entrypoint 和 exit code 问题。
 
@@ -11,7 +13,7 @@
 在适用任务中使用：
 
 ```text
-$powershell-bash-safety
+$shell-safety
 ```
 
 典型场景包括：
@@ -23,20 +25,20 @@ $powershell-bash-safety
 - Compose、wrapper 与 image entrypoint 的主进程 owner 不唯一。
 - 已授权 Windows → SSH → Linux/FNOS sudo 动作需要每次使用独立 WPF 遮蔽输入，且不能让密码进入 queued PTY、terminal history、argv、environment 或文件。
 
-一次性 sudo 路径先生成 exact action digest，取得对应 action-time authorization 后，才在固定 PowerShell 7 STA session 中显示 `PasswordBox.SecurePassword` GUI。GUI 前后都会复核 destination、absolute target argv、SSH/helper、`known_hosts`、可选 identity metadata 与 `MaxOutputBytes`；任何漂移、cancel、mismatch、GUI/SSH 前置失败、输出超限或 protocol 不完整都停止，不回退到普通终端或持久 SecretStore。具体合同与示例见 [中文操作参考](skills/powershell-bash-safety/references/zh-CN.md#6-一次性-sudo-遮蔽输入)。
+一次性 sudo 路径先生成 exact action digest，取得对应 action-time authorization 后，才在固定 PowerShell 7 STA session 中显示 `PasswordBox.SecurePassword` GUI。GUI 前后都会复核 destination、absolute target argv、SSH/helper、`known_hosts`、可选 identity metadata 与 `MaxOutputBytes`；任何漂移、cancel、mismatch、GUI/SSH 前置失败、输出超限或 protocol 不完整都停止，不回退到普通终端或持久 SecretStore。具体合同与示例见 [中文操作参考](skills/shell-safety/references/zh-CN.md#6-一次性-sudo-遮蔽输入)。
 
-规范源码支持显式可选 `HostKeyAlias`，将已核对的安全 token 原样绑定到 digest、GUI 确认及 SSH argv，保留 `-F NUL` 下的 host-key 查询身份；未传入保持原合同。值域与停止条件见 [HostKeyAlias 合同](skills/powershell-bash-safety/references/zh-CN.md#显式-hostkeyalias)。
+规范源码支持显式可选 `HostKeyAlias`，将已核对的安全 token 原样绑定到 digest、GUI 确认及 SSH argv，保留 `-F NUL` 下的 host-key 查询身份；未传入保持原合同。值域与停止条件见 [HostKeyAlias 合同](skills/shell-safety/references/zh-CN.md#显式-hostkeyalias)。
 
-对话框采用 680×600 布局、折叠技术详情和滚动，支持绑定摘要的 `ActionTitle`/`ActionDescription`；第一框 Tab 到第二框，第二框 Enter 确认，Esc 取消。输入时提供非空/一致性反馈，只有两次非空且一致才允许确认；有误时留窗修正。不提供眼睛按钮。假口令交互预览命令见 [对话框说明](skills/powershell-bash-safety/references/zh-CN.md#原版对话框布局与键盘)。
+对话框采用 680×600 布局、折叠技术详情和滚动，支持绑定摘要的 `ActionTitle`/`ActionDescription`；第一框 Tab 到第二框，第二框 Enter 确认，Esc 取消。输入时提供非空/一致性反馈，只有两次非空且一致才允许确认；有误时留窗修正。不提供眼睛按钮。假口令交互预览命令见 [对话框说明](skills/shell-safety/references/zh-CN.md#原版对话框布局与键盘)。
 
 ## 项目结构
 
-- `skills/powershell-bash-safety/`：权威 Skill package。
-- `skills/powershell-bash-safety/scripts/Test-PowerShellSyntax.ps1`：官方 PowerShell AST Parser 的安全薄适配器，提供精确收集、计数、ReparsePoint、Text/Json 与稳定退出码。
-- `skills/powershell-bash-safety/scripts/Test-ShellSyntax.ps1`：Bash/sh parser 的 backend-aware 薄适配器，提供 dialect、identity、path-domain、Text/Json 与条件式 ShellCheck。
-- `skills/powershell-bash-safety/scripts/Invoke-MaskedSudoOverSsh.psm1`：action digest、WPF 双输入、结构化 SSH argv、短暂内存传输与三层结果编排。
-- `skills/powershell-bash-safety/scripts/Invoke-MaskedSudoOverSsh.Remote.sh`：不保存密码的 remote FIFO protocol helper；把 sudo 与 target 输出、退出码分层，对每个流执行硬上限并精确清理工作根。
-- `skills/powershell-bash-safety/references/windows-bootstrap.md`：缺少固定 PowerShell 7 入口时按需读取的一次性引导边界。
+- `skills/shell-safety/`：权威 Skill package。
+- `skills/shell-safety/scripts/Test-PowerShellSyntax.ps1`：官方 PowerShell AST Parser 的安全薄适配器，提供精确收集、计数、ReparsePoint、Text/Json 与稳定退出码。
+- `skills/shell-safety/scripts/Test-ShellSyntax.ps1`：Bash/sh parser 的 backend-aware 薄适配器，提供 dialect、identity、path-domain、Text/Json 与条件式 ShellCheck。
+- `skills/shell-safety/scripts/Invoke-MaskedSudoOverSsh.psm1`：action digest、WPF 双输入、结构化 SSH argv、短暂内存传输与三层结果编排。
+- `skills/shell-safety/scripts/Invoke-MaskedSudoOverSsh.Remote.sh`：不保存密码的 remote FIFO protocol helper；把 sudo 与 target 输出、退出码分层，对每个流执行硬上限并精确清理工作根。
+- `skills/shell-safety/references/windows-bootstrap.md`：缺少固定 PowerShell 7 入口时按需读取的一次性引导边界。
 - `tests/Test-PowerShellSyntax.Tests.ps1`：使用 Pester 和系统临时目录 fixtures 的离线行为验证。
 - `tests/Test-ShellSyntax.Tests.ps1`：覆盖 Bash/sh dialect、backend、identity、工具缺失和输出合同的 Pester fixtures。
 - `tests/Test-ConsumerDepth.Tests.ps1`：离线验证消费者角色、授权深度、Target gate 与 portable package 引用边界。
@@ -51,9 +53,9 @@ $powershell-bash-safety
 
 ## 当前限制
 
-截至 2026-09-23，本机已按固定 commit `0467a97bc859b9b4e71fffe218ee29f823adc35f` 安装为独立普通目录，并通过新会话发现、加载和 8 文件一致性验收（`INSTALLED_LOAD_VERIFIED`）。它不随源码编辑、切分支或 pull 自动更新；加载验收不代表 SSH/sudo 真实运行通过。
+当前独立安装为 `shell-safety`，8 文件、101232 bytes，与规范包逐字节及 SHA-256 一致；当前 Desktop 回合已发现并全文加载新 Skill。此文件/发现层结论不等于运行验收；修正冷启动权限与 roots 后的第二次完整 Desktop 重启、12 项 WPF 场景及真实 SSH/sudo 均未在本次命名交付中运行。
 
-GitHub `main` 已包含该 commit，但当日唯一 tag/Release `v1.0.0` 仍对应旧提交 `4f395835835ac35c8c51a6d52790e4aee7fc8b31`，不能用旧 Release 表示当前安装版本。固定制品身份、导出/验证、显式更新与回退流程见 [架构说明](docs/architecture.md#固定版本交付与更新回退)。
+本次新 identifier/路径通过 `main` 交付；历史 `v1.1.0` 固定提交 `04c437eeac4ff8d4f5d14340d5aa56e6a0ec69ba`，归档仍使用旧 `powershell-bash-safety` 包路径，不包含 `skills/shell-safety/`，不能把旧 tag/资产称为新 ID 版本。固定制品身份、导出/验证、显式更新与回退流程见 [架构说明](docs/architecture.md#固定版本交付与更新回退)。
 
 - Skill 只提供防错与验证方法，不授予远程写入、部署、服务中断、凭据读取或生产执行权限。
 - parser PASS 不等于 package、transport 或 runtime PASS。

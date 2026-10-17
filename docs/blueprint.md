@@ -2,7 +2,7 @@
 
 ## 意图与受众
 
-本项目维护一个独立、可移植、可验证的 `powershell-bash-safety` Codex Skill，帮助需要编写、审阅、打包或执行 PowerShell、SSH、Bash 与 POSIX sh 链路的任务，在进入高风险运行前发现解释器、参数、引号处理、字节和跨平台边界错误。
+本项目维护一个独立、可移植、可验证的 `shell-safety` Codex Skill，帮助需要编写、审阅、打包或执行 PowerShell、SSH、Bash 与 POSIX sh 链路的任务，在进入高风险运行前发现解释器、参数、引号处理、字节和跨平台边界错误。
 
 本文件是项目意图的共享权威。用户入口由 [README](../README.md) 负责，设计与正式边界由 [DESIGN](../DESIGN.md) 及 [架构说明](architecture.md) 负责，项目维护规则由 [AGENTS](../AGENTS.md) 负责。
 
@@ -10,7 +10,7 @@
 
 | 可观察结果 | 验证入口 |
 | --- | --- |
-| 规范包自包含、可发现，并符合 OpenAI Skill 结构 | `skills/powershell-bash-safety/` 与包验证器 |
+| 规范包自包含、可发现，并符合 OpenAI Skill 结构 | `skills/shell-safety/` 与包验证器 |
 | PowerShell 与 Bash/POSIX sh 使用身份明确的解释器和成熟解析器；不确定输入失败时停止 | 包内语法适配器及项目级适配器测试 |
 | 已授权 sudo 动作可以使用独立 Windows GUI 遮蔽输入，且 secret 不进入 PTY、argv、environment、日志或文件；不可信输出受双层硬上限约束 | 一次性 sudo module、remote FIFO helper 与 synthetic pressure/large-output tests |
 | Fast、Milestone、Target 保持条件式分层，本地解析器 PASS 不冒充后续层证据 | [架构说明](architecture.md)与离线合同测试 |

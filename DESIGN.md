@@ -1,13 +1,14 @@
-# PowerShell 与 Bash 安全执行设计
+# Shell Safety / Shell 安全设计
 
 ## 状态
 
 - 项目权威位置：repository root（`.`）。
 - 项目意图权威：[docs/blueprint.md](docs/blueprint.md)。
-- 规范 Skill：`skills/powershell-bash-safety/`。
+- 规范 Skill：`skills/shell-safety/`。
 - 用户级安装目录是独立安装镜像，不是源码权威。
+- 项目根名称为 `skill_shell_safety`，源码 identifier 为 `shell-safety`；当前独立安装 `.agents/skills/shell-safety` 已与规范包 byte-exact 对齐，并通过本轮 Desktop 的新 ID 发现和全文加载核验。额外完整重启、GUI 与真实目标运行的未验边界统一见架构说明。
 - 规范源码与用户级安装镜像保持独立；只有完成显式逐字节同步与验证，才能声明某一安装快照与源码一致。
-- 2026-09-23 的本机固定安装已达到 `INSTALLED_LOAD_VERIFIED`，消费入口是普通目录，不跟随开发 checkout。版本/制品身份及后续交付流程统一见 [固定版本交付与更新回退](docs/architecture.md#固定版本交付与更新回退)。
+- 2026-09-23 的 `INSTALLED_LOAD_VERIFIED` 是旧 ID 固定安装的历史验收，不代表当前新 ID 已作为 tag/Release 发布。历史制品身份及更新流程统一见 [固定版本交付与更新回退](docs/architecture.md#固定版本交付与更新回退)。
 
 ## 目标
 
@@ -26,9 +27,9 @@
 
 `New-SolisSudoActionDigest` 先绑定 authorization ID、destination、absolute target argv、timeout、`MaxOutputBytes`、固定 OpenSSH/helper hashes、`known_hosts` hash 与可选 identity file metadata。`Invoke-SolisMaskedSudoOverSsh` 在 GUI 前校验一次，用户确认后再校验一次，封闭输入期间的 identity/command/output-policy drift。
 
-显式可选 `HostKeyAlias` 通过单一安全 token 验证原样追加到 action record，传入 GUI 确认及结构化 `-o` 参数；不读取配置，不改变 host-key 验证策略。未传入时不添加字段或 option，保留原 digest 序列化与参数合同；值域和错误由 [中文操作参考](skills/powershell-bash-safety/references/zh-CN.md#显式-hostkeyalias)统一定义。
+显式可选 `HostKeyAlias` 通过单一安全 token 验证原样追加到 action record，传入 GUI 确认及结构化 `-o` 参数；不读取配置，不改变 host-key 验证策略。未传入时不添加字段或 option，保留原 digest 序列化与参数合同；值域和错误由 [中文操作参考](skills/shell-safety/references/zh-CN.md#显式-hostkeyalias)统一定义。
 
-对话框统一在 module 内构造，由公开 `ActionTitle`/`ActionDescription` 传递 non-secret 纯文本并按显式字段绑定 digest；消费方不再需要 AST 字符串替换。固定 680×600 布局、折叠技术详情/180 高滚动区和外层滚动沿用已确认版本；第一框 Tab，第二框 Enter 与按钮共用确认，Esc 取消，无全局默认提交。两框变化时用 SecurePassword 临时验证，非空且一致才启用确认，空值/不一致留窗；最终接受仍通过原安全比较并产生只读副本。按用户决定不提供眼睛显示。详细规则见 [对话框合同](skills/powershell-bash-safety/references/zh-CN.md#原版对话框布局与键盘)。
+对话框统一在 module 内构造，由公开 `ActionTitle`/`ActionDescription` 传递 non-secret 纯文本并按显式字段绑定 digest；消费方不再需要 AST 字符串替换。固定 680×600 布局、折叠技术详情/180 高滚动区和外层滚动沿用已确认版本；第一框 Tab，第二框 Enter 与按钮共用确认，Esc 取消，无全局默认提交。两框变化时用 SecurePassword 临时验证，非空且一致才启用确认，空值/不一致留窗；最终接受仍通过原安全比较并产生只读副本。按用户决定不提供眼睛显示。详细规则见 [对话框合同](skills/shell-safety/references/zh-CN.md#原版对话框布局与键盘)。
 
 WPF window 只在 PowerShell 7 STA、interactive Windows session 中启用；两个 `PasswordBox.SecurePassword` 只通过 BSTR code units 比较，不构造完整 plaintext managed string。接受值从 BSTR 进入可清理 `char[]`/UTF-8 `byte[]`，由 stdin `BaseStream` 写入并以单独 LF 终止；SSH `ArgumentList` 禁止 PTY 与 SSH interactive authentication fallback。remote helper 使用 FIFO drain target/sudo streams，target stdin 固定 `/dev/null`；outer SSH user 在 sudo 前创建 mode `0600` status file，避免依赖 root 新建文件的可读性。四个 remote streams 各自受 `MaxOutputBytes` 硬上限约束，Windows transport 也以派生上限并发读取 stdout/stderr；超限返回 `OUTPUT_LIMIT_EXCEEDED`。工作根只包含 FIFO 与 non-secret exit status，并由 trap 精确清理。
 
@@ -38,10 +39,10 @@ WPF window 只在 PowerShell 7 STA、interactive Windows session 中启用；两
 
 ```mermaid
 flowchart LR
-    Source["规范源码<br/>skills/powershell-bash-safety/"]
+    Source["规范源码<br/>skills/shell-safety/"]
     Package["固定 commit 制品<br/>清单与包哈希"]
     Gate{"显式授权与逐字节验证<br/>安装或更新门"}
-    Mirror["用户级安装镜像<br/>%USERPROFILE%\.codex\skills\powershell-bash-safety"]
+    Mirror["用户级安装镜像<br/>%USERPROFILE%\.agents\skills\shell-safety"]
 
     Source --> Package --> Gate --> Mirror
 ```
@@ -62,7 +63,7 @@ flowchart LR
 | [架构说明](docs/architecture.md) | 执行层、验证门、解释器与证据边界 | 实施者、审查者 | 现行 | 详细架构 |
 | [消费者前向测试计划](docs/consumer-forward-test-plan.md) | 角色/授权深度的项目级测试证据 | 项目维护者、D10 | 现行 / 项目级 | 消费者测试合同；不进入可移植包 |
 | [项目规则](AGENTS.md) | Swift Cycle 绑定、维护硬门与 Git 边界 | 智能体、维护者 | 现行 | 项目执行规则 |
-| `skills/powershell-bash-safety/` | 可移植 Skill 指令、参考与语法适配器 | Skill 用户、维护者 | 现行 | 规范包 |
+| `skills/shell-safety/` | 可移植 Skill 指令、参考与语法适配器 | Skill 用户、维护者 | 现行 | 规范包 |
 | `tests/` | 适配器行为与项目级合同验证 | 维护者、审查者 | 现行 / 项目级 | 离线测试 |
 | `TODO.md` / `DEVLOG.md` | 当前行动、失败与维护证据 | 本地维护者 | 本地 / 已忽略 | 本地执行记录；不进入 Git 检查点 |
 

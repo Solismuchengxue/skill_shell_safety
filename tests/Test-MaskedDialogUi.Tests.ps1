@@ -1,6 +1,6 @@
 #requires -Version 7.0
 $root = Split-Path -Parent $PSScriptRoot
-$modulePath = Join-Path $root 'skills/powershell-bash-safety/scripts/Invoke-MaskedSudoOverSsh.psm1'
+$modulePath = Join-Path $root 'skills/shell-safety/scripts/Invoke-MaskedSudoOverSsh.psm1'
 Describe 'Masked dialog presentation contract' {
     BeforeAll {
         $module = Import-Module $modulePath -Force -PassThru

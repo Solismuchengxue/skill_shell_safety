@@ -2,7 +2,7 @@
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $planPath = Join-Path $projectRoot 'docs\consumer-forward-test-plan.md'
-$portableRoot = Join-Path $projectRoot 'skills\powershell-bash-safety'
+$portableRoot = Join-Path $projectRoot 'skills\shell-safety'
 $powerShellAdapter = Join-Path $portableRoot 'scripts\Test-PowerShellSyntax.ps1'
 $shellAdapter = Join-Path $portableRoot 'scripts\Test-ShellSyntax.ps1'
 $planText = [IO.File]::ReadAllText($planPath)

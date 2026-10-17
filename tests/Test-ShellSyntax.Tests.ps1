@@ -1,7 +1,7 @@
 #requires -Version 7.0
 
 $pwshPath = 'C:\Program Files\PowerShell\7\pwsh.exe'
-$adapterPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\skills\powershell-bash-safety\scripts\Test-ShellSyntax.ps1')).Path
+$adapterPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\skills\shell-safety\scripts\Test-ShellSyntax.ps1')).Path
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ("shell-syntax-pester-{0}" -f [guid]::NewGuid().ToString('N'))
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 

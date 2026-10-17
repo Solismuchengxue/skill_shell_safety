@@ -1,7 +1,7 @@
 #requires -Version 7.0
 
 $pwshPath = 'C:\Program Files\PowerShell\7\pwsh.exe'
-$validatorPath = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath '..\skills\powershell-bash-safety\scripts\Test-PowerShellSyntax.ps1')).Path
+$validatorPath = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath '..\skills\shell-safety\scripts\Test-PowerShellSyntax.ps1')).Path
 $testRoot = Join-Path -Path ([IO.Path]::GetTempPath()) -ChildPath ("powershell-syntax-pester-{0}" -f [guid]::NewGuid().ToString('N'))
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 

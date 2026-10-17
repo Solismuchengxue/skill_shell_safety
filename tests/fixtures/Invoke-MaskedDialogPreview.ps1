@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') { throw 'PREVIEW_REQUIRES_STA' }
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-$modulePath = Join-Path $PSScriptRoot '../../skills/powershell-bash-safety/scripts/Invoke-MaskedSudoOverSsh.psm1'
+$modulePath = Join-Path $PSScriptRoot '../../skills/shell-safety/scripts/Invoke-MaskedSudoOverSsh.psm1'
 $module = Import-Module $modulePath -Force -PassThru
 # 本入口仅构造 UI，没有公开执行入口或任何 process/SSH/sudo 调用。
 $dialog = & $module {

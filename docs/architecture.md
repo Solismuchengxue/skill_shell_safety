@@ -3,8 +3,12 @@
 ## 状态与用途
 
 - 状态：已采用的项目级设计。
-- 用途：定义 `powershell-bash-safety` 的多层解释模型、验证门、权威和停止条件。
+- 用途：定义 `shell-safety` 的多层解释模型、验证门、权威和停止条件。
 - 更新触发：新增解释器、凭据输入面、传输、归档、容器启动责任模式，或确认新的可复用失败原因。
+
+项目为 `skill_shell_safety` / `shell-safety`（Shell Safety / Shell 安全），权威源码位于 `skills/shell-safety/`。当前独立普通目录安装为 `.agents/skills/shell-safety`，8 文件/101232 bytes，与规范包的 relative set、bytes 和 SHA-256 一致；本轮 Desktop 已发现并全文加载新 Skill。初次冷启动的权限/roots 差异经同 ID 重绑与权限重选后已核修正，但修正后的第二次完整 Desktop 重启仍为 NOT_RUN；本次命名交付未运行 12 项 WPF 场景或真实 SSH/sudo。文件、发现、GUI 与目标运行结论不得相互替代。
+
+下文固定版本记录保留当时仓库、包根、ZIP 名称与哈希，不用新名称改写历史制品；现有 `v1.1.0` 固定在 `04c437eeac4ff8d4f5d14340d5aa56e6a0ec69ba`，其源码/资产仍为旧 ID 路径，不包含本次 `skills/shell-safety/` 命名交付。
 
 ## 执行层
 
@@ -76,12 +80,12 @@ flowchart LR
 
 关键合同：
 
-- 原版 GUI 由 `New-MaskedCredentialDialog` 构造，`Show-MaskedCredentialDialog` 管理模态展示和输入框清理；二者均为 module 私有实现，不增加公开 exports。显式 `ActionTitle`/`ActionDescription` 原样进入摘要并作为纯文本显示，缺省不增加 record 字段；消费方不通过 AST 改写窗口。固定 680×600、折叠详情和键盘规则见 [对话框合同](../skills/powershell-bash-safety/references/zh-CN.md#原版对话框布局与键盘)。
+- 原版 GUI 由 `New-MaskedCredentialDialog` 构造，`Show-MaskedCredentialDialog` 管理模态展示和输入框清理；二者均为 module 私有实现，不增加公开 exports。显式 `ActionTitle`/`ActionDescription` 原样进入摘要并作为纯文本显示，缺省不增加 record 字段；消费方不通过 AST 改写窗口。固定 680×600、折叠详情和键盘规则见 [对话框合同](../skills/shell-safety/references/zh-CN.md#原版对话框布局与键盘)。
 - 输入变化的前台校验复用 `Resolve-SecureInputPair -ValidateOnly`，只返回状态并释放两个临时 SecureString/BSTR，不创建接受用 secret 副本。空值/不一致留窗、确认禁用；进入共用确认路径时重验，并继续执行原最终校验，只有最终成功才设置 Completed 并关闭。此输入修正不改变执行后 fail-closed/无自动 retry 合同。
 
 - GUI 只读取两个 `PasswordBox.SecurePassword`，cancel、empty、mismatch、non-Windows、MTA、session 0 或 WPF unavailable 均停止；没有 terminal fallback。
 - action digest 绑定 authorization ID、host/user/port、absolute target argv、timeout、`MaxOutputBytes`、OpenSSH/helper SHA-256、`known_hosts` SHA-256 和可选 identity file 的 path/length/UTC mtime。显式可选 `HostKeyAlias` 通过单一安全 token 验证后原样追加为 `host_key_alias`，不 trim 或改大小写；未传入保持原 record/digest。private key 内容不由 helper 读取。
-- OpenSSH 使用 `-F NUL` 关闭 config file、PTY、password/keyboard-interactive prompt 与重试；host key 必须由显式 `known_hosts` 验证。调用方从已核对配置明确提供 HostKeyAlias 时，同一值参与 GUI 动作确认并且只加入一组独立 `-o HostKeyAlias=...`；模块不解析配置或降低 `StrictHostKeyChecking=yes`。非法值/alias drift 在 GUI 和启动前失败；完整值域与错误见 [合同说明](../skills/powershell-bash-safety/references/zh-CN.md#显式-hostkeyalias)。target command 通过确定性 POSIX single-quote contract 进入固定 remote helper，不拼接动态 shell program。
+- OpenSSH 使用 `-F NUL` 关闭 config file、PTY、password/keyboard-interactive prompt 与重试；host key 必须由显式 `known_hosts` 验证。调用方从已核对配置明确提供 HostKeyAlias 时，同一值参与 GUI 动作确认并且只加入一组独立 `-o HostKeyAlias=...`；模块不解析配置或降低 `StrictHostKeyChecking=yes`。非法值/alias drift 在 GUI 和启动前失败；完整值域与错误见 [合同说明](../skills/shell-safety/references/zh-CN.md#显式-hostkeyalias)。target command 通过确定性 POSIX single-quote contract 进入固定 remote helper，不拼接动态 shell program。
 - 值仅短暂存在 WPF/SecureString/BSTR/stream buffers；BSTR 由 `ZeroFreeBSTR` 清理，接受值在所有路径 `Dispose()`。remote work root 不含密码，只含 FIFO 与 outer SSH user 在 sudo 前创建的 non-secret target status，并由 trap 精确删除。
 - remote 四个输出流各自最多保留 `MaxOutputBytes`；reader 在截断后继续 drain FIFO，Windows transport 同时对 SSH stdout/stderr 设硬上限，均不使用无界 `ReadToEndAsync`。任一层超限统一 `ErrorLayer=OutputLimit`、`FailureCode=OUTPUT_LIMIT_EXCEEDED`。
 - remote protocol 完整时 SSH transport exit 为 0；sudo 与 target exit 另行报告。target 失败不改标为 SSH 失败，protocol 缺失也不冒充 target 结果。
@@ -156,7 +160,7 @@ flowchart LR
 
 2026-09-23 本机安装基线为 `0467a97bc859b9b4e71fffe218ee29f823adc35f`，package 相对路径 `skills/powershell-bash-safety/`，来源仓库 `Solismuchengxue/skill_powershell_bash_safety`。已验收 ZIP 名称为 `powershell-bash-safety_0467a97.zip`，SHA-256 为 `9a81aac4421405d0c072f44f76c0c586b4ffc10d25931feb7000a5a632449545`，包根为 `powershell-bash-safety/`，包含 8 个文件。
 
-安装状态 `INSTALLED_LOAD_VERIFIED` 只代表普通目录消费入口、新会话发现/完整加载、文件集及 SHA-256 一致；业务操作为 0。源码编辑、切分支和 pull 不会改变这一安装快照；源码与安装不要求永久跟随最新 main。当前 `v1.0.0` 的 tag commit 比此基线早 1 个提交，Release 无附加 assets；固定 commit 的本机制品不能称为新 tag/Release 已发布。
+该历史 `INSTALLED_LOAD_VERIFIED` 只代表当时普通目录消费入口、新会话发现/完整加载、文件集及 SHA-256 一致，业务操作为 0。源码编辑、切分支和 pull 不会自动更新安装；源码与安装不要求永久跟随最新 main。后续公开 `v1.1.0` 的原 ZIP/manifest 仍保留此旧包身份；这不表示当前新 ID 或最新安装已形成新 tag/Release。
 
 ### 最小可复现交付
 
@@ -170,6 +174,6 @@ flowchart LR
 
 - 每次更新选择固定制品，通过新的路径清单与独立授权，从已验证的 prepared 普通目录提升到消费入口；禁止向 Junction force install。移动旧入口和移动新目录之间存在空窗，不称原子切换。
 - 文件替换后先标 `SWITCHED_PENDING_LOAD_VERIFICATION`，只有新会话发现、加载和安装一致性通过才升为 `INSTALLED_LOAD_VERIFIED`；不更改原切换收据中的历史状态，用新的验收记录追加结论。
-- 保留旧入口与来源证据。长期回退优先采用上一独立安装快照；本次保留的原 Junction 仍指向开发源码，不能称不可变备份。只有链接身份/目标、源码内容与候选均未漂移且目的路径未被占用时才可恢复；不满足即停止，不覆盖、不删除、不回退开发 checkout。
+- 保留旧入口与来源证据。长期回退优先采用上一独立安装快照；历史切换曾保留的原 Junction 仍指向开发源码，不能称不可变备份。只有链接身份/目标、源码内容与候选均未漂移且目的路径未被占用时才可恢复；不满足即停止，不覆盖、不删除、不回退开发 checkout。
 - 失败候选保留到事先批准的 failed 路径，再依批准方案恢复旧入口；不从加载失败自动推导删除或再次安装权限。恢复文件不证明旧会话已重载，回退后仍需独立加载核验。
 - 安装制品、逐文件 manifest、切换收据、新会话验收证据保留；拒绝的导出、诊断解包目录及旧链接只能列为精确删除候选。清理另行批准，删除链接对象不得遍历其源码目标，不对共享 staging 根递归清理。

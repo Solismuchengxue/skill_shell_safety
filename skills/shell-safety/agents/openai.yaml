@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shell Safety / Shell 安全"
+  short_description: "保护 PowerShell、SSH、sudo 与 Linux Shell 的跨平台执行边界"
+  default_prompt: "使用 $shell-safety 审查并验证这段 PowerShell、SSH、sudo 与 Linux shell 执行链。"

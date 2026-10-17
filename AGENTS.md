@@ -1,11 +1,11 @@
 # AGENTS.md
 
-本仓库维护一个独立的跨平台 Shell 安全执行 Skill。权威 package 位于 `skills/powershell-bash-safety/`。
+本仓库维护一个独立的跨平台 Shell 安全执行 Skill。权威 package 位于 `skills/shell-safety/`。
 
 ## 项目边界
 
-- 项目根使用下划线命名；标准 Skill identifier 与 package 目录保持 `powershell-bash-safety`。
-- `skills/powershell-bash-safety/` 是权威源码；用户级安装目录只是独立 deployment mirror。
+- 项目根使用下划线命名；标准 Skill identifier 与 package 目录保持 `shell-safety`。
+- `skills/shell-safety/` 是权威源码；用户级安装目录只是独立 deployment mirror。
 - 源码变更不自动授权覆盖、重装、重连或删除安装镜像。
 - 本项目已通过 `$swift-cycle` v1.3.0 完成首次采用；持久绑定只作用于本项目，不修改或复制 Swift Cycle，也不修改相邻仓库及其工作树。
 - 本 Skill 只提供 PowerShell、SSH、Bash、POSIX sh、archive、transport 与 container 执行链的防错和验证方法，不扩大远程写入、部署、服务中断或凭据权限。
@@ -37,7 +37,7 @@
 
 - Windows 上统一使用 `C:\Program Files\PowerShell\7\pwsh.exe`；固定路径缺失时停止并走独立 bootstrap gate，不使用 `powershell.exe` 替代。
 - 多行或非简单 PowerShell 逻辑先写入 `.ps1`、`.psm1` 或 `.psd1`，再由固定 `pwsh.exe -File` 调用。
-- 创建或修改上述文件后，使用 `skills/powershell-bash-safety/scripts/Test-PowerShellSyntax.ps1` 验证实际受影响文件；不得依赖用户级 `.codex\tools` 副本。
+- 创建或修改上述文件后，使用 `skills/shell-safety/scripts/Test-PowerShellSyntax.ps1` 验证实际受影响文件；不得依赖用户级 `.codex\tools` 副本。
 - 日常默认只检查本次受影响文件；不因普通修改自动扫描全仓或执行全部 parser/lint/target/runtime gate。
 - 单文件断言一个样本；目录或 path list 批量验证必须传入权威 `ExpectedCount`，并核对 expected、actual 和 failures。
 - canonical script 只编排官方 `Parser.ParseFile`；PSScriptAnalyzer 缺失时保持 `NOT_RUN`，不得自动安装。Pester 只验证 adapter 行为，不替代 AST gate。
@@ -46,7 +46,7 @@
 
 ## 验证
 
-- 对 `skills/powershell-bash-safety/` 运行 OpenAI `quick_validate.py`。
+- 对 `skills/shell-safety/` 运行 OpenAI `quick_validate.py`。
 - PowerShell 示例使用 AST parser；Bash 与 POSIX sh 示例分别由绑定的目标 interpreter 执行 `-n` 检查。
 - adapter 行为测试使用已可用的 Pester；检查 Text/Json、稳定退出码、ReparsePoint、空集合和 count mismatch，并断言非空 test count。
 - Shell 使用 `Test-ShellSyntax.ps1`；Fast 只运行已绑定 backend 的 `bash -n`/`sh -n`，Milestone 才探测 ShellCheck，Target 才进入经授权的 WSL/container/主机解释器。

@@ -1,9 +1,9 @@
 ---
-name: powershell-bash-safety
+name: shell-safety
 description: Use when PowerShell, SSH, Bash, or POSIX sh chains risk parameter, quoting, interpreter, byte, transport, exit-code, or authorized interactive sudo-input failures across platforms.
 ---
 
-# PowerShell 与 Bash 安全执行
+# Shell Safety / Shell 安全
 
 ## 三级模式
 
