@@ -22,12 +22,15 @@ $shell-safety
 - Windows 上生成的脚本或 archive 上传后在 Linux 失败；
 - `bash` 与 `/bin/sh` dialect 混用；
 - native command 的 argv、`$LASTEXITCODE` 或多层 quoting 不可靠；
+- 用户希望双击 PS1 或以 PS1 为入口的交互工具，需要保留脚本身份并正确配置 PowerShell 7 快捷方式；
 - Compose、wrapper 与 image entrypoint 的主进程 owner 不唯一。
 - 已授权 Windows → SSH → Linux/FNOS sudo 动作需要每次使用独立 WPF 遮蔽输入，且不能让密码进入 queued PTY、terminal history、argv、environment 或文件。
 
 一次性 sudo 路径先生成 exact action digest，取得对应 action-time authorization 后，才在固定 PowerShell 7 STA session 中显示 `PasswordBox.SecurePassword` GUI。GUI 前后都会复核 destination、absolute target argv、SSH/helper、`known_hosts`、可选 identity metadata 与 `MaxOutputBytes`；任何漂移、cancel、mismatch、GUI/SSH 前置失败、输出超限或 protocol 不完整都停止，不回退到普通终端或持久 SecretStore。具体合同与示例见 [中文操作参考](skills/shell-safety/references/zh-CN.md#6-一次性-sudo-遮蔽输入)。
 
 规范源码支持显式可选 `HostKeyAlias`，将已核对的安全 token 原样绑定到 digest、GUI 确认及 SSH argv，保留 `-F NUL` 下的 host-key 查询身份；未传入保持原合同。值域与停止条件见 [HostKeyAlias 合同](skills/shell-safety/references/zh-CN.md#显式-hostkeyalias)。
+
+双击 PS1 的普通消费项目优先使用 `.lnk` 直接启动经核验的 PowerShell 7，沿用项目明确绑定；未绑定时有界发现入口，不把本仓维护路径当成唯一合法位置。覆盖前保留旧快捷方式恢复副本，保存后回读四字段；配置通过不代表业务启动成功。具体规则见 [双击交互启动合同](skills/shell-safety/references/zh-CN.md#7-windows-双击交互启动)。
 
 对话框采用 680×600 布局、折叠技术详情和滚动，支持绑定摘要的 `ActionTitle`/`ActionDescription`；第一框 Tab 到第二框，第二框 Enter 确认，Esc 取消。输入时提供非空/一致性反馈，只有两次非空且一致才允许确认；有误时留窗修正。不提供眼睛按钮。假口令交互预览命令见 [对话框说明](skills/shell-safety/references/zh-CN.md#原版对话框布局与键盘)。
 
@@ -53,7 +56,7 @@ $shell-safety
 
 ## 当前限制
 
-当前独立安装为 `shell-safety`，8 文件、101232 bytes，与规范包逐字节及 SHA-256 一致，已通过新 ID 发现与全文加载核验。本次命名迁移的重启后权限/根有限复验已通过，但仅覆盖本次观察，不证明未来所有重启均稳定或业务运行通过；本次迁移未运行 12 项 WPF 场景及真实 SSH/sudo。详细边界见 [架构说明](docs/architecture.md#状态与用途)。
+当前独立安装为 `shell-safety`，8 文件、106870 bytes，与规范包逐字节及 SHA-256 一致。2026-10-28 双击规则更新仅同步三份 Markdown，另五文件保持不变，已全文读回三份安装指令；已有聊天可能缓存旧指令，不保证自动重载。命名迁移时的新 ID 发现、全文加载及重启后权限/根有限复验保留原证据边界，不证明未来所有重启均稳定或业务运行通过；该次迁移未运行 12 项 WPF 场景及真实 SSH/sudo。详细边界见 [架构说明](docs/architecture.md#状态与用途)。
 
 本次新 identifier/路径通过 `main` 交付；历史 `v1.1.0` 固定提交 `04c437eeac4ff8d4f5d14340d5aa56e6a0ec69ba`，归档仍使用旧 `powershell-bash-safety` 包路径，不包含 `skills/shell-safety/`，不能把旧 tag/资产称为新 ID 版本。固定制品身份、导出/验证、显式更新与回退流程见 [架构说明](docs/architecture.md#固定版本交付与更新回退)。
 
@@ -61,7 +64,7 @@ $shell-safety
 - parser PASS 不等于 package、transport 或 runtime PASS。
 - 用户级已安装副本是独立 mirror；源码变化不会自动安装。
 - PSScriptAnalyzer 是可选增强；不可用时明确 `NOT_RUN`，不由 syntax adapter 安装。Pester 与编辑器实时诊断都不替代官方 AST gate。
-- Windows 正常流程固定调用 `C:\Program Files\PowerShell\7\pwsh.exe`；PowerShell 7、Starship、Pastel Powerline、NFM、Profile、PATH 与终端设置均是独立 action-time milestone，本 Skill 不自动执行这些变更。
+- 本 Skill 维护验证器及一次性 sudo 安全链固定调用 `C:\Program Files\PowerShell\7\pwsh.exe`；普通消费项目的双击入口遵守上述合同。PowerShell 7、Starship、Pastel Powerline、NFM、Profile、PATH 与终端设置均是独立 action-time milestone，本 Skill 不自动执行这些变更。
 - 默认 Fast 只验证受影响文件；Milestone 条件增加 lint/tests；Target 仅在发布、部署或明确目标兼容性需求时进入。Git Bash PASS 不是 Linux/FNOS/container PASS。
 - 消费者角色不会自动扩大验证深度：实施者默认 Fast、按相关变化进入 Milestone；只读审查者不继承 fixture、Target 或运维执行权限。
 - 一次性 sudo helper 不授予 action-time authorization，也不证明真实 GUI foreground、SSH authentication、sudo policy 或 target runtime；已有 Windows 本地 synthetic 与安装加载证据不能替代这些 `NOT_VERIFIED` 的 Target 层。

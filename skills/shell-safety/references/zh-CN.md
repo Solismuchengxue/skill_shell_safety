@@ -1,6 +1,6 @@
 # PowerShell 与 Shell 高效验证参考
 
-本文件只记录两个薄适配器的命令合同。PowerShell/PSScriptAnalyzer/Pester/ShellCheck/shfmt/WSL 的第三方手册不复制到 package。
+本文件记录两个薄适配器、一次性 sudo 输入及 Windows 双击启动的操作合同。PowerShell/PSScriptAnalyzer/Pester/ShellCheck/shfmt/WSL 的第三方手册不复制到 package。
 
 ## 1. 模式选择
 
@@ -135,3 +135,38 @@ GUI cancel、MTA、non-Windows、session 0、WPF 不可用、helper/SSH/known_ho
 ```
 
 这是只构造 UI 的假口令预览，不走公开执行入口，不调用 SSH/sudo；只输入虚构口令。可在第一框输入 `SYNTHETIC-ONLY`，Tab 到第二框先输入不同值观察禁用和留窗，再改为同值后 Enter；Esc 取消。测试 fixture 不属于 portable package，也不代表已安装版本。自动 `Layout`、`FirstEnter`、`Tab`、`SecondEnter`、`Click`、`Mismatch`、`Empty`、`Escape`、`DoubleConfirm`、`CorrectThenEnter`、`InvalidateAfterMatch`、`CloseCancel` scenarios 使用固定 synthetic 输入并自动关窗。
+
+## 7. Windows 双击交互启动
+
+仅当用户希望双击 `.ps1` 或以 `.ps1` 为入口的交互工具时，优先推荐 `.lnk → PowerShell 7 → PS1`。这是普通消费项目的启动建议，不是新启动器框架；不强套普通命令行、计划任务或原生 exe。本 Skill 自带验证器及一次性 sudo 链继续遵守固定入口合同。
+
+### 选择并核验解释器
+
+- 已有明确路径/版本绑定时遵守绑定，不能因固定位置缺失就换成另一个版本；绑定失效或与请求冲突时报告并澄清。其他可用版本只能作为候选，不能默默替代。合法绑定可以在非 C 盘。
+- 未绑定时，依次检查用户指定候选、项目已有候选、PATH 解析出的 Application 入口及标准安装位置。标准位置有界检查当前机器的 Program Files 下 `PowerShell/7/pwsh.exe` 及用户明确给出的安装根，不递归扫描全盘或所有用户目录。优先沿用已验证的 PATH 默认入口，不追逐最高版本或主动改选预览版；多个候选仍无法唯一绑定时一次性澄清。
+- 先核对候选是可读取的真实可执行文件，再用不加载 Profile 的只读版本探针核验实际进程绝对路径、PowerShell 7 版本和退出码。可使用固定、简短的 `-Command` 版本/进程路径查询，不能运行目标 PS1 来探测。函数、alias、包装脚本或未解析的 App Execution Alias 不能直接充当最终 TargetPath。
+- 一个路径不存在不等于未安装；已检查范围内没有可用版本时，如实列出范围并提示安装 PowerShell 7。权限拒绝、文件身份不明或探针失败为 `NOT_VERIFIED`，不能断言未安装。未经授权不自动安装，也不静默回退到 Windows PowerShell 5.1。
+
+### 快捷方式合同与示例
+
+`TargetPath` 仅放核验后的 exe 绝对路径，不放整条命令或额外包裹引号。`Arguments` 默认 `-NoProfile -File "脚本绝对路径"`；宿主参数（如明确要求的 `-Sta`）在 `-File` 前，脚本参数在 PS1 路径后。路径和值分别按 Windows 命令行及 `pwsh -File` 规则引用，不把用户数据写成 PowerShell 表达式；复杂引号/数组参数不能靠猜测拼接，保留既有参数合同，必要时报告无法直接表达。
+
+以下假设各路径和 STA 要求均已核验，仅示范字段，不表示创建或启动业务：
+
+```text
+TargetPath: D:\工具 空间\pwsh.exe
+Arguments: -NoProfile -Sta -File "D:\示例 项目\交互工具.ps1" -InputPath "D:\输入 空间\数据.txt"
+WorkingDirectory: D:\示例 项目
+WindowStyle: 1 (正常可见)
+```
+
+WorkingDirectory 沿用已知项目约定；没有约定时采用 PS1 所在目录。交互窗口默认正常可见，不默认隐藏/最小化。若脚本已有明确的 Profile 或宿主要求与默认参数冲突，先报告，不改 PS1 或全局 Profile 来掩盖依赖。不生成或调用 cmd/bat、不使用 cmd 中转、不构造复杂嵌套 `-Command`；不默认添加提权、Bypass、NoExit，不改文件关联、PATH、执行策略或权限。已有且获授权的提权逻辑照常保留，不新增提权入口。
+
+### 保存、恢复与验收
+
+- 优先保留原 PS1，核对其 hash/签名/Verifier 身份不变。同名 `.lnk` 存在但没有覆盖授权时保留旧对象并报告冲突；已有更新授权时不重复逐步请批，覆盖前先保留并核验一份可恢复的旧 `.lnk`，备份失败就停止，不覆盖。
+- 保存后重新打开 `.lnk`，逐项比较 TargetPath、Arguments、WorkingDirectory、WindowStyle，不能以 COM Save 未报错代替回读。明确告诉用户双击哪个快捷方式，以及旧快捷方式如何恢复。
+- 配置核验通过只证明入口已保存且字段一致。未经授权不启动业务程序；实际启动、参数绑定和业务成功分别报告，未运行保持 `NOT_RUN`/`NOT_VERIFIED`。不增加重复审批，也不扩大既有动作授权。
+- 推荐话术：“建议用快捷方式直接启动已核验的 PowerShell 7，保留原 PS1，不经 cmd。入口已保存并回读，请双击指定的 `.lnk`；本次未自动启动，实际运行尚未验证。”只建议而未创建时，不使用“已保存并回读”。
+
+参数语义见 [Microsoft pwsh 文档](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pwsh)，字段示例见 [Windows Script Host 快捷方式文档](https://learn.microsoft.com/en-us/troubleshoot/windows-client/admin-development/create-desktop-shortcut-with-wsh)。

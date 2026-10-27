@@ -6,7 +6,7 @@
 - 用途：定义 `shell-safety` 的多层解释模型、验证门、权威和停止条件。
 - 更新触发：新增解释器、凭据输入面、传输、归档、容器启动责任模式，或确认新的可复用失败原因。
 
-项目为 `skill_shell_safety` / `shell-safety`（Shell Safety / Shell 安全），权威源码位于 `skills/shell-safety/`。当前独立普通目录安装为 `.agents/skills/shell-safety`，8 文件/101232 bytes，与规范包的 relative set、bytes 和 SHA-256 一致，已通过新 ID 发现与全文加载核验。
+项目为 `skill_shell_safety` / `shell-safety`（Shell Safety / Shell 安全），权威源码位于 `skills/shell-safety/`。当前独立普通目录安装为 `.agents/skills/shell-safety`，8 文件/106870 bytes，与规范包的 relative set、大小、bytes 和 SHA-256 一致。2026-10-28 双击规则更新只同步三份 Markdown，另五文件保持原 hash，并已全文读回三份安装指令；原八文件安装包恢复快照保留在 Skill 扫描目录之外。已有聊天可能缓存旧指令，此文件更新不表示所有会话自动重载。命名迁移时的新 ID 发现与全文加载核验保留原历史结论。
 
 2026-10-17，本次命名迁移已通过重启后的权限/根有限复验：原项目与聊天身份保留，实际 cwd/Git 根均匹配新项目根；同一新回合的有效权限为 `workspace-write / on-request / auto_review`，显式可写范围仅本项目根与原可视化目录（系统临时路径另计，受保护子路径仍只读）。Agent 原回复未暴露的 approval_policy，由协调方核对同一新回合 turn_context 补证，不以全局 config 推断。
 
@@ -119,7 +119,8 @@ flowchart LR
 
 ## 解释器合同
 
-- Windows PowerShell 验证门先绑定 `C:\Program Files\PowerShell\7\pwsh.exe`。固定入口缺失时停止；引导、PATH、Profile、字体和终端改动都属于独立执行时层。
+- 本 Skill 维护验证器及一次性 sudo 安全链的 Windows PowerShell 入口先绑定 `C:\Program Files\PowerShell\7\pwsh.exe`。固定入口缺失时停止；引导、PATH、Profile、字体和终端改动都属于独立执行时层。
+- 普通消费项目双击 PS1 的入口建议采用 `.lnk → PowerShell 7 → PS1`，尊重明确绑定及 Verifier 身份。未绑定时有界发现，不强制 C 盘路径；不扩展到普通命令行、计划任务或原生 exe。发现、恢复副本、四字段回读与停止条件只在 [双击交互启动合同](../skills/shell-safety/references/zh-CN.md#7-windows-双击交互启动)维护；配置验收不替代实际启动或参数绑定，不改现有验证器/sudo 链。
 - `.ps1`、`.psm1`、`.psd1` 修改后由包内置验证器执行 AST 解析门；它只读取源码，不执行目标脚本。
 - 内置脚本只编排官方 `Parser.ParseFile`；单文件 `ExpectedCount` 固定为 1，目录或路径清单批量必须显式给出正数 `ExpectedCount`。去重后空集合或实际数量不匹配都在解析器前失败。
 - 直接 ReparsePoint 目标被拒绝，目录内 ReparsePoint 与约定依赖目录被跳过并计数；Text/Json 共享 `discovered`、`validated`、`skipped`、`parse_errors` 和 0/1/2 退出合同。

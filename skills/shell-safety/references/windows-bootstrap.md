@@ -1,10 +1,10 @@
 # Windows PowerShell 7 一次性引导
 
-仅在 Windows 缺少预期 PowerShell 7，或用户明确要求初始化 Windows shell 体验时读取本文件。这里定义检查与授权边界，不自动安装或修改机器。
+本文件面向本 Skill 维护验证器、一次性 sudo 安全链的固定入口，以及用户明确选择的相应 Windows shell 初始化。只有缺少该预期入口或用户要求该初始化时才读取；不自动安装或修改机器。普通消费项目的双击启动见 [双击交互启动合同](zh-CN.md#7-windows-双击交互启动)，不因其 PowerShell 7 位于其他合法路径就强制 bootstrap 到本节位置。
 
 ## 固定运行入口
 
-正常 Windows 流程使用：
+上述固定入口流程使用：
 
 ```text
 C:\Program Files\PowerShell\7\pwsh.exe

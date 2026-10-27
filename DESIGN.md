@@ -6,7 +6,7 @@
 - 项目意图权威：[docs/blueprint.md](docs/blueprint.md)。
 - 规范 Skill：`skills/shell-safety/`。
 - 用户级安装目录是独立安装镜像，不是源码权威。
-- 项目根名称为 `skill_shell_safety`，源码 identifier 为 `shell-safety`；当前独立安装 `.agents/skills/shell-safety` 已与规范包 byte-exact 对齐，并通过新 ID 发现和全文加载核验；本次重启后的权限/根有限复验已通过。该次观察的证据边界及 GUI、真实目标运行的未验范围统一见 [架构说明](docs/architecture.md#状态与用途)。
+- 项目根名称为 `skill_shell_safety`，源码 identifier 为 `shell-safety`；当前独立安装 `.agents/skills/shell-safety` 为 8 文件/106870 bytes，与规范包 byte-exact 对齐。2026-10-28 仅同步三份 Markdown 并全文读回，另五文件不变；旧聊天不保证自动重载。命名迁移时已通过新 ID 发现、全文加载和重启后权限/根有限复验；该次观察的证据边界及 GUI、真实目标运行的未验范围统一见 [架构说明](docs/architecture.md#状态与用途)。
 - 规范源码与用户级安装镜像保持独立；只有完成显式逐字节同步与验证，才能声明某一安装快照与源码一致。
 - 2026-09-23 的 `INSTALLED_LOAD_VERIFIED` 是旧 ID 固定安装的历史验收，不代表当前新 ID 已作为 tag/Release 发布。历史制品身份及更新流程统一见 [固定版本交付与更新回退](docs/architecture.md#固定版本交付与更新回退)。
 
@@ -104,7 +104,8 @@ flowchart LR
 
 ## Windows 引导边界
 
-- Windows Skill 执行入口固定为 `C:\Program Files\PowerShell\7\pwsh.exe`；缺失时停止并进入一次性引导设计，不回退到 `powershell.exe`。
+- 本 Skill 维护验证器及一次性 sudo 安全链的 Windows 入口固定为 `C:\Program Files\PowerShell\7\pwsh.exe`；缺失时停止并进入一次性引导设计，不回退到 `powershell.exe`。
+- 普通消费项目双击 PS1 时优先 `.lnk → PowerShell 7 → PS1`，遵守项目绑定、保留脚本身份；有界发现、字段、恢复副本及配置/启动分层验收统一见 [双击交互启动合同](skills/shell-safety/references/zh-CN.md#7-windows-双击交互启动)。不扩展到普通命令行、计划任务或原生 exe，不改变既有 Verifier 合同。
 - PowerShell 当前发布渠道、MSI/Wix 或未来安装器格式必须在执行时重新核实，不成为永久常量。
 - PowerShell 7、Starship、Pastel Powerline、JetBrainsMono Nerd Font Mono、Profile、PATH 与终端默认 Profile 分别授权和验收。
 - 不删除 Windows PowerShell 5.1 系统组件，不永久改写系统 PATH；绝对 `pwsh.exe`、命令局部 PATH 和可选终端默认 Profile 是正常使用的优先边界。

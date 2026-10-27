@@ -40,9 +40,15 @@ Gate 是条件式层级，不是每次全部执行，也不是拆成多张用户
 - cancel、empty、mismatch、GUI/session 不可用、前置文件/ReparsePoint、action drift、SSH start/timeout、输出超限或 remote protocol 不完整时 fail closed；不回退到 echo pipe、argv/env、plaintext temp file、DPAPI、SecretStore 或普通终端，也不自动 retry。
 - 该方式只减少屏幕回显与意外历史记录；值仍短暂存在当前用户进程内存并经 SSH 加密通道传输。真实 SSH、sudo policy、目标命令和 GUI 可见性仍需在获授权的 Target 里分别验证。
 
+## Windows 双击交互启动
+
+用户希望双击 `.ps1` 或以 `.ps1` 为入口的交互工具时，优先推荐 `.lnk` 直接启动经核验的 PowerShell 7；保留原 PS1、签名与 Verifier 身份，不经过 cmd/bat。普通消费项目遵守其明确的解释器绑定；未绑定时有界发现可用入口，不把本仓维护路径泛化为唯一合法位置。
+
+入口选择、`TargetPath`/`Arguments`/`WorkingDirectory`/`WindowStyle`、覆盖前恢复副本及配置/启动分层验收，见 [Windows 双击交互启动合同](references/zh-CN.md#7-windows-双击交互启动)。本规则不强套普通命令行、计划任务或原生 exe，也不改变下面的固定安全链。
+
 ## 选择与边界
 
-- Windows PowerShell 固定使用 `C:\Program Files\PowerShell\7\pwsh.exe`；缺失时读取 [Windows 一次性引导](references/windows-bootstrap.md)并停止，不回退到 `powershell.exe`。
+- 本 Skill 维护验证器与一次性 sudo 安全链在 Windows 固定使用 `C:\Program Files\PowerShell\7\pwsh.exe`；缺失时读取 [Windows 一次性引导](references/windows-bootstrap.md)并停止，不回退到 `powershell.exe`。普通消费项目的双击入口按上节合同处理。
 - PowerShell 使用 [Test-PowerShellSyntax.ps1](scripts/Test-PowerShellSyntax.ps1)，Shell 使用 [Test-ShellSyntax.ps1](scripts/Test-ShellSyntax.ps1)。两者都只是官方/成熟 parser 的安全编排器，不自研分析算法。
 - parser、lint、target compatibility 与 runtime 是不同结论。前一层 PASS 不替代后一层；真实变更、安装、凭据、服务中断和生产执行均需独立授权。
 
